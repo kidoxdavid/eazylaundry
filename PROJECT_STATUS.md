@@ -15,8 +15,9 @@ Decisions D1–D5 approved ("go with your recommendations"): dogfood-first launc
 | `@eazy/api` auth, sessions, MFA, throttling, temp passwords | 13 | pass |
 | `@eazy/api` RBAC / anti-escalation / branch scope / audit | 7 | pass |
 | `@eazy/api` configuration engine | 4 | pass |
+| `@eazy/api` customers (CRUD, search, duplicates, addresses, consent history, permissions, cross-tenant) | 11 | pass |
 | `@eazy/money` rounding, allocation, tax (known cases + property tests vs independent oracle) | 16 | pass |
-Total **62/62**. The isolation suite was mutation-checked: disabling RLS on `branches` makes 7 tests fail.
+Total **73/73**. The isolation suite was mutation-checked: disabling RLS on `branches` makes 7 tests fail.
 UI verified by a scripted Playwright run against the real API (register → add branch with server-side validation → add member → audit → sign out). No automated frontend tests yet.
 
 ## Completed (Phase 1)
@@ -30,7 +31,8 @@ UI verified by a scripted Playwright run against the real API (register → add 
 
 ## Phase 2 progress
 - `@eazy/money`: bigint minor-unit money, exact decimal rates, rounding modes (half-up/half-even/up/down), largest-remainder allocation, configurable tax engine (multi-component, compound, inclusive/exclusive, line/order rounding). Inclusive pricing preserves the entered total exactly. Not yet wired into any API.
-- Next: customers → services & price lists → server-side pricing engine (using this package) → orders/POS.
+- **Customers (done):** tenant-scoped customers with E.164 phone normalisation, duplicate prevention by phone/email among live records (archive frees them), guests, Canadian addresses (postal/province validated in DB and API, one default per customer), append-only consent history (CASL-oriented), optimistic concurrency, trigram search, audit trail. UI: list/search, create, detail with edit, addresses, consent switches. Verified in a real browser.
+- Next: services & price lists → server-side pricing engine (using this package) → orders/POS.
 
 ## Not done yet (Phase 1 gaps — honest list)
 - Staging deployment / Terraform baseline. (CI now runs on GitHub and passes; the first runs failed because `db-bootstrap.sh` mishandled a superuser URL — fixed.)
@@ -41,6 +43,9 @@ UI verified by a scripted Playwright run against the real API (register → add 
 - Seed/demo-tenant tooling, generated ERD.
 
 ## Known limitations / technical debt
+- Customer phone numbers are displayed in E.164 (+17805550101) rather than a friendly format.
+- Customer merge, tags, segments and CSV import are not built (later tier).
+- Two Vite majors coexist in the workspace (web: 6, vitest: 7); the api vitest config casts the swc plugin. Align versions when convenient.
 - Service queries rely on RLS for tenant filtering rather than repeating `WHERE tenant_id` (deliberate single source of truth; permission and branch checks are still in services).
 - Failed logins are logged but not stored in the tenant audit log (no tenant context); a platform security-events stream arrives with the platform console.
 - Session idle timeout is global config, not per tenant.

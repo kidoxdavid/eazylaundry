@@ -3,6 +3,7 @@ import { useAuth } from './auth';
 import { Button } from './components/ui';
 import { Audit } from './pages/Audit';
 import { Branches } from './pages/Branches';
+import { CustomerDetail, Customers } from './pages/Customers';
 import { ChangePassword, Login, Register } from './pages/Auth';
 import { Overview } from './pages/Overview';
 import { Roles } from './pages/Roles';
@@ -18,6 +19,7 @@ function Shell() {
   if (me.user.mustChangePassword) return <ChangePassword />;
   const items = [
     { to: '/', label: 'Overview', show: true, end: true },
+    { to: '/customers', label: 'Customers', show: can('customer.read') },
     { to: '/branches', label: 'Branches', show: can('branch.read') },
     { to: '/team', label: 'Team', show: can('member.read') },
     { to: '/roles', label: 'Roles', show: can('role.read') },
@@ -61,6 +63,8 @@ export function App() {
       <Route path="/register" element={<Register />} />
       <Route element={<Shell />}>
         <Route index element={<Overview />} />
+        <Route path="customers" element={<Customers />} />
+        <Route path="customers/:id" element={<CustomerDetail />} />
         <Route path="branches" element={<Branches />} />
         <Route path="team" element={<Team />} />
         <Route path="roles" element={<Roles />} />

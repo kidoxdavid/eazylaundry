@@ -10,12 +10,12 @@ import { uuidv7 } from '../common/ids.js';
 import type { Actor } from '../common/types.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { DATABASE } from '../db/db.module.js';
+import { PROVINCES, postalCode } from '../common/canada.js';
 
 const tz = z.string().refine((t) => { try { new Intl.DateTimeFormat('en', { timeZone: t }); return true; } catch { return false; } }, 'Unknown time zone');
 const address = z.object({
   line1: z.string().max(120).optional(), line2: z.string().max(120).optional(), city: z.string().max(80).optional(),
-  province: z.string().length(2).toUpperCase().optional(),
-  postalCode: z.string().trim().toUpperCase().regex(/^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z] ?\d[ABCEGHJ-NPRSTV-Z]\d$/, 'Invalid Canadian postal code').optional(),
+  province: z.string().toUpperCase().pipe(z.enum(PROVINCES)).optional(), postalCode: postalCode.optional(),
 }).strict();
 const createSchema = z.object({ code: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,8}$/), name: z.string().trim().min(2).max(80), address: address.default({}), timezone: tz.default('America/Edmonton') });
 const patchSchema = z.object({ name: z.string().trim().min(2).max(80), address, timezone: tz, status: z.enum(['active', 'archived']) }).partial().refine((v) => Object.keys(v).length > 0, 'Nothing to update');

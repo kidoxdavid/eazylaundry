@@ -22,6 +22,7 @@ import { HealthController } from './health.controller.js';
 import { AuthorizationService } from './iam/authorization.service.js';
 import { MembersController } from './iam/members.controller.js';
 import { RolesController } from './iam/roles.controller.js';
+import { CustomersController } from './customers/customers.controller.js';
 import { BranchesController } from './tenancy/branches.controller.js';
 import { TenantsService } from './tenancy/tenants.service.js';
 
@@ -32,7 +33,7 @@ export function buildAppModule(cfg: AppConfig) {
       { name: 'default', ttl: 60_000, limit: cfg.throttleLimit },
       { name: 'auth', ttl: 60_000, limit: cfg.authThrottleLimit, skipIf: (ctx) => !Reflect.getMetadata(AUTH_THROTTLE_KEY, ctx.getHandler()) },
     ])],
-    controllers: [HealthController, AuthController, BranchesController, RolesController, MembersController, ConfigController, AuditController],
+    controllers: [HealthController, AuthController, BranchesController, RolesController, MembersController, ConfigController, AuditController, CustomersController],
     providers: [
       { provide: APP_CONFIG, useValue: cfg },
       { provide: FIELD_CIPHER, useValue: new FieldCipher(cfg.encryptionSecret) },
