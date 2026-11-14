@@ -16,8 +16,10 @@ Decisions D1–D5 approved ("go with your recommendations"): dogfood-first launc
 | `@eazy/api` RBAC / anti-escalation / branch scope / audit | 7 | pass |
 | `@eazy/api` configuration engine | 4 | pass |
 | `@eazy/api` customers (CRUD, search, duplicates, addresses, consent history, permissions, cross-tenant) | 11 | pass |
+| `@eazy/api` pricing engine (pure unit + property tests) | 9 | pass |
+| `@eazy/api` catalogue, price history, branch overrides, tax rates, discounts/limits, cross-tenant | 11 | pass |
 | `@eazy/money` rounding, allocation, tax (known cases + property tests vs independent oracle) | 16 | pass |
-Total **73/73**. The isolation suite was mutation-checked: disabling RLS on `branches` makes 7 tests fail.
+Total **93/93**. The isolation suite was mutation-checked: disabling RLS on `branches` makes 7 tests fail.
 UI verified by a scripted Playwright run against the real API (register → add branch with server-side validation → add member → audit → sign out). No automated frontend tests yet.
 
 ## Completed (Phase 1)
@@ -32,7 +34,9 @@ UI verified by a scripted Playwright run against the real API (register → add 
 ## Phase 2 progress
 - `@eazy/money`: bigint minor-unit money, exact decimal rates, rounding modes (half-up/half-even/up/down), largest-remainder allocation, configurable tax engine (multi-component, compound, inclusive/exclusive, line/order rounding). Inclusive pricing preserves the entered total exactly. Not yet wired into any API.
 - **Customers (done):** tenant-scoped customers with E.164 phone normalisation, duplicate prevention by phone/email among live records (archive frees them), guests, Canadian addresses (postal/province validated in DB and API, one default per customer), append-only consent history (CASL-oriented), optimistic concurrency, trigram search, audit trail. UI: list/search, create, detail with edit, addresses, consent switches. Verified in a real browser.
-- Next: services & price lists → server-side pricing engine (using this package) → orders/POS.
+- **Services, price lists & pricing engine (done):** categories, services (per kg / per item / fixed, tax category, express, turnaround), append-only price versions (history never rewritten; branch override beats the general price), default Standard price list and Alberta GST 5% seeded per tenant as editable data, effective-dated multi-component tax rates, config-driven tax mode (inclusive/exclusive) and rounding level. `POST /pricing/quote` is the single server-side pricing path (min charge, express, discount allocation, tax; discounts gated by `discount.apply` and its amount limit). UI: services & prices, change price, live price calculator, settings for tax mode/rounding. Verified in a real browser.
+- Next: orders & POS (order + order lines snapshotting the quote, order numbers, intake, payments).
+- (superseded) services & price lists → server-side pricing engine (using this package) → orders/POS.
 
 ## Not done yet (Phase 1 gaps — honest list)
 - Staging deployment / Terraform baseline. (CI now runs on GitHub and passes; the first runs failed because `db-bootstrap.sh` mishandled a superuser URL — fixed.)
@@ -43,6 +47,9 @@ UI verified by a scripted Playwright run against the real API (register → add 
 - Seed/demo-tenant tooling, generated ERD.
 
 ## Known limitations / technical debt
+- Price lists of kind contract/customer exist in the schema but have no API/UI yet (Phase 3 commercial accounts). Bundles/packages and rule-based pricing (time/volume) are not built.
+- Catalogue reads reuse `order.read` and quotes use `order.create` (no separate `catalogue.read`). Adding a NEW permission later needs a per-tenant backfill of role copies; migrations run as the owner role and cannot see tenant rows under FORCE RLS, so plan a controlled maintenance path before the first permission addition.
+- Money crosses the API as integer minor units (JSON numbers, asserted safe) — documented convention.
 - Customer phone numbers are displayed in E.164 (+17805550101) rather than a friendly format.
 - Customer merge, tags, segments and CSV import are not built (later tier).
 - Two Vite majors coexist in the workspace (web: 6, vitest: 7); the api vitest config casts the swc plugin. Align versions when convenient.

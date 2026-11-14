@@ -55,6 +55,9 @@ export class TenantsService {
               await tx.query(`INSERT INTO role_permissions (tenant_id, role_id, permission_code) VALUES ($1,$2,$3)`, [tenantId, roleId, code]);
             }
           }
+          // Seed data (editable by the business, not logic): default price list and Alberta GST.
+          await tx.query(`INSERT INTO price_lists (id, tenant_id, name, kind, is_default) VALUES ($1,$2,'Standard','standard',true)`, [uuidv7(), tenantId]);
+          await tx.query(`INSERT INTO tax_rates (id, tenant_id, code, name, rate, effective_from) VALUES ($1,$2,'GST','GST',0.05,'2000-01-01')`, [uuidv7(), tenantId]);
           const membershipId = uuidv7();
           await tx.query(`INSERT INTO user_memberships (id, tenant_id, user_id, role_id, all_branches) VALUES ($1,$2,$3,$4,true)`,
             [membershipId, tenantId, userId, ownerRoleId]);

@@ -5,6 +5,7 @@ import { ErrorBanner, Field, PageHeader, Select } from '../components/ui';
 
 const KEYS = [
   { key: 'tax.price_mode', label: 'Prices are entered', options: [['exclusive', 'Excluding tax'], ['inclusive', 'Including tax']] },
+  { key: 'tax.rounding_level', label: 'Round tax', options: [['line', 'Per line'], ['order', 'On the whole order']] },
   { key: 'weight.display_unit', label: 'Weight unit', options: [['kg', 'Kilograms'], ['lb', 'Pounds']] },
 ];
 

@@ -7,6 +7,7 @@ import { CustomerDetail, Customers } from './pages/Customers';
 import { ChangePassword, Login, Register } from './pages/Auth';
 import { Overview } from './pages/Overview';
 import { Roles } from './pages/Roles';
+import { Services } from './pages/Services';
 import { Settings } from './pages/Settings';
 import { Team } from './pages/Team';
 import { post } from './api';
@@ -20,6 +21,7 @@ function Shell() {
   const items = [
     { to: '/', label: 'Overview', show: true, end: true },
     { to: '/customers', label: 'Customers', show: can('customer.read') },
+    { to: '/services', label: 'Services', show: can('order.read') },
     { to: '/branches', label: 'Branches', show: can('branch.read') },
     { to: '/team', label: 'Team', show: can('member.read') },
     { to: '/roles', label: 'Roles', show: can('role.read') },
@@ -65,6 +67,7 @@ export function App() {
         <Route index element={<Overview />} />
         <Route path="customers" element={<Customers />} />
         <Route path="customers/:id" element={<CustomerDetail />} />
+        <Route path="services" element={<Services />} />
         <Route path="branches" element={<Branches />} />
         <Route path="team" element={<Team />} />
         <Route path="roles" element={<Roles />} />
