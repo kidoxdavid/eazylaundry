@@ -92,7 +92,7 @@ describe('authentication & sessions', () => {
     expect((await staff.client.get('/branches')).status).toBe(200);
     expect((await T.client.patch(`/members/${staff.membershipId}`, { status: 'suspended' })).status).toBe(200);
     expect((await staff.client.get('/branches')).status).toBe(401);
-    expect((await new Client(app).post('/auth/login', { email: staff.email, password: PASSWORD })).status).toBe(200); // login ok…
+    expect((await new Client(app).post('/auth/login', { email: staff.email, password: `${PASSWORD}-changed` })).status).toBe(200); // the person can still sign in; they just have no active membership
   });
 
   it('a user in two businesses switches context; adding an existing email never alters their credentials', async () => {
@@ -120,6 +120,21 @@ describe('authentication & sessions', () => {
     expect((await other.get('/auth/me')).status).toBe(401);
     expect((await T.client.get('/auth/me')).status).toBe(200);
     expect((await new Client(app).post('/auth/login', { email: T.email, password: 'another-long-password' })).status).toBe(200);
+  });
+});
+
+describe('temporary passwords', () => {
+  it('blocks all business routes until a member sets their own password', async () => {
+    const app = await makeApp();
+    const T = await registerTenant(app);
+    const staff = await addStaff(T.client, 'cashier', { keepTemporaryPassword: true });
+    expect((await staff.client.get('/auth/me')).body.user.mustChangePassword).toBe(true);
+    const blocked = await staff.client.get('/branches');
+    expect(blocked.status).toBe(403); expect(blocked.body.code).toBe('PASSWORD_CHANGE_REQUIRED');
+    expect((await staff.client.post('/auth/change-password', { currentPassword: PASSWORD, newPassword: 'my-own-long-password' })).status).toBe(204);
+    expect((await staff.client.get('/branches')).status).toBe(200);
+    expect((await T.client.get('/auth/me')).body.user.mustChangePassword).toBe(false); // owner unaffected
+    await app.close();
   });
 });
 

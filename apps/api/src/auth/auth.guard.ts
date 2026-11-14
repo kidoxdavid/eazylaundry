@@ -36,6 +36,7 @@ export class AuthGuard implements CanActivate {
     actor.requestId = req.requestId;
     req.actor = actor;
     if (access.kind === 'authenticated') return true;
+    if (actor.mustChangePassword) throw forbidden('PASSWORD_CHANGE_REQUIRED', 'You must change your temporary password first');
 
     if (!actor.tenantId) throw forbidden('NO_ACTIVE_TENANT', 'No active business membership');
     for (const code of access.codes) {

@@ -3,35 +3,56 @@
 _Last updated: 2026-11-14_
 
 ## Current phase
-**Phase 0 — Discovery & Architecture** (awaiting review; no application code written)
+**Phase 1 — Platform Foundation: substantially complete, with the open items below.**
+Decisions D1–D5 approved ("go with your recommendations"): dogfood-first launch · Stripe Connect · separate SSR storefront · operational ledger (not a GL) · driver PWA.
 
-## Completed
-- Repository inspected: empty (no prior work to preserve).
-- Discovery pack written: `docs/discovery/00`–`13` covering PRD, personas/journeys, functional requirements, screen inventory, architecture (system, integration, deployment), ERD & schema, tenant security & permission matrix & threat model, production workflows, financial architecture, SaaS entitlements, UX spec, testing strategy, risks, commercialization, roadmap.
+## Test results (local, real PostgreSQL 16)
+| Suite | Tests | Result |
+|---|---|---|
+| `@eazy/database` permission catalogue | 3 | pass |
+| `@eazy/api` tenant isolation — DB/RLS | 11 | pass |
+| `@eazy/api` tenant isolation — HTTP + route-policy coverage | 8 | pass |
+| `@eazy/api` auth, sessions, MFA, throttling, temp passwords | 13 | pass |
+| `@eazy/api` RBAC / anti-escalation / branch scope / audit | 7 | pass |
+| `@eazy/api` configuration engine | 4 | pass |
+Total **46/46**. The isolation suite was mutation-checked: disabling RLS on `branches` makes 7 tests fail.
+UI verified by a scripted Playwright run against the real API (register → add branch with server-side validation → add member → audit → sign out). No automated frontend tests yet.
 
-## In progress
-- Awaiting owner decisions D1–D5 (see `docs/discovery/00-index-and-decisions.md`).
+## Completed (Phase 1)
+- Monorepo (pnpm workspaces), TypeScript strict, GitHub Actions CI definition, docker-compose, bootstrap script.
+- Database: forward-only SQL migration runner; three DB roles (`eazy_owner` for migrations, `eazy_app` NOBYPASSRLS non-owner for the API); UUIDv7 keys.
+- **Tenant isolation:** forced RLS on every tenant table (catalog test enforces this), composite `(tenant_id, id)` FKs, per-transaction `SET LOCAL` context (cannot leak across pooled connections), fail-closed with no context, append-only triggers on audit and config history, narrow `SECURITY DEFINER` functions as the only user-creation/lookup path.
+- Auth: Argon2id, opaque server-side sessions (hash stored), httpOnly + SameSite cookies, CSRF double-submit, idle + absolute expiry, account lockout, uniform failure responses, TOTP MFA (secret AES-GCM encrypted), per-IP throttling on credential routes, forced change of admin-issued temporary passwords (enforced server-side).
+- Authorization: fail-closed global guard (routes without a policy are denied; a test enumerates all routes), permission catalogue + role templates copied per tenant, permission re-read every request, branch scoping, amount limits, anti-escalation rules (cannot grant/modify authority you lack, no self-modification, last-owner protection).
+- Tenant registration (tenant + organization + branch + roles + owner in one transaction), branches (Canadian postal validation), members, roles, versioned configuration with branch > tenant > default resolution, audit log written in the same transaction as each change.
+- Web shell (React/Vite/Tailwind/TanStack Query/React Hook Form/Zod): sign in/up, MFA code prompt, forced password change, branches, team, roles (read-only), settings, audit log; permission-aware navigation; business switcher.
 
-## Outstanding (next)
-- Phase 1 platform foundation (backlog in `docs/discovery/13-roadmap-scope.md` §3).
+## Not done yet (Phase 1 gaps — honest list)
+- Staging deployment / Terraform baseline; the CI workflow has been written but **not yet run on GitHub**.
+- OpenAPI generation + typed client (isolation harness currently enumerates routes via Nest metadata instead).
+- OTel/Sentry observability, Redis/BullMQ worker, outbox dispatcher (table exists, unused).
+- Roles editing UI (API exists), password reset by email, email invitations (temporary passwords are used instead), email verification, MFA enforcement for owners.
+- Frontend automated tests, accessibility audit, i18n scaffolding.
+- Seed/demo-tenant tooling, generated ERD.
 
-## Known bugs
-None (no code).
+## Known limitations / technical debt
+- Service queries rely on RLS for tenant filtering rather than repeating `WHERE tenant_id` (deliberate single source of truth; permission and branch checks are still in services).
+- Failed logins are logged but not stored in the tenant audit log (no tenant context); a platform security-events stream arrives with the platform console.
+- Session idle timeout is global config, not per tenant.
+- Login reveals that the password was correct before asking for the MFA code (standard trade-off).
 
-## Technical debt
-None yet.
-
-## Architectural decisions (summary)
-Modular monolith + worker · PostgreSQL shared schema + RLS (FORCE) + composite FKs · Drizzle + SQL-first migrations · Money as integer minor units · Immutable double-entry operational ledger · Outbox events · SSE live updates · Customers tenant-scoped · Provider adapters (Stripe Connect first) · Separate SSR storefront (proposed) · Separate platform console · AWS ca-central-1.
-Details: `docs/discovery/04-architecture.md` §4 and `13-roadmap-scope.md` §5.
+## Architectural decisions (changes since Phase 0)
+- **ADR-003 amended:** Phase 1 uses plain parameterised `pg` with SQL-first migrations. Drizzle/Kysely will be re-evaluated when Phase 2 introduces complex queries. Rationale: tiny table surface so far; RLS context handling is explicit in `Database.withContext`.
+- Registration never bypasses RLS: the context is set to the new tenant/user ids.
+- Existing emails added as members keep their credentials and the response is identical (no account takeover/enumeration through invitations).
 
 ## Dependencies / external lead items
-Stripe Connect account · Email domain auth (SPF/DKIM/DMARC) · Google Maps billing · AWS accounts · Legal docs · Design-partner recruitment · Reference hardware (scanner, receipt & label printers).
+Stripe Connect account · Email domain auth (SPF/DKIM/DMARC) · Google Maps billing · AWS accounts · Legal docs · Design-partner recruitment · Reference hardware.
 
 ## Next milestones
-1. Review & sign-off of discovery pack (D1–D5).
-2. Phase 1 kickoff: repo scaffold, CI, DB roles, RLS harness.
-3. Isolation test suite green before any business feature.
+1. Close Phase 1 gaps that block Phase 2: OpenAPI + typed client, CI verified green on GitHub, staging deploy.
+2. Phase 2 kickoff: customers, services & price lists, pricing/tax engine (money package first, with property tests).
+3. POS → orders → intake → labels/scan → workflow engine → QC/rework → handover → cash shifts.
 
 ## Unverified claims / research debt
-Pricing, market size, competitor landscape, conversion and unit-economics targets are **hypotheses**, not validated (see `docs/discovery/12-risks-commercialization.md` §C).
+Pricing, market size, competitor landscape, conversion and unit-economics targets are **hypotheses** (see `docs/discovery/12-risks-commercialization.md` §C).

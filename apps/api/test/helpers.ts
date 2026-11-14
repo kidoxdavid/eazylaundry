@@ -57,7 +57,7 @@ export async function registerTenant(app: NestExpressApplication, name = uniq('B
 }
 
 /** Owner adds a staff member with a role key, returns a logged-in client. */
-export async function addStaff(owner: Client, roleKey: string, opts: { allBranches?: boolean; branchIds?: string[] } = {}) {
+export async function addStaff(owner: Client, roleKey: string, opts: { allBranches?: boolean; branchIds?: string[]; keepTemporaryPassword?: boolean } = {}) {
   const roles = (await owner.get('/roles')).body.items as any[];
   const role = roles.find((r) => r.key === roleKey);
   const email = `${uniq(roleKey)}@example.test`;
@@ -67,6 +67,10 @@ export async function addStaff(owner: Client, roleKey: string, opts: { allBranch
   const c = new Client(owner.app);
   const l = await c.post('/auth/login', { email, password: PASSWORD });
   if (l.status !== 200) throw new Error(`login failed ${l.status}`);
+  if (!opts.keepTemporaryPassword) {
+    const ch = await c.post('/auth/change-password', { currentPassword: PASSWORD, newPassword: `${PASSWORD}-changed` });
+    if (ch.status !== 204) throw new Error(`change-password failed ${ch.status}`);
+  }
   return { client: c, email, membershipId: res.body.id as string, roleId: role.id as string };
 }
 

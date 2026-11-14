@@ -38,15 +38,16 @@ export class SessionService {
       `UPDATE sessions SET last_seen_at = now() WHERE id = $1 AND last_seen_at < now() - interval '60 seconds'`, [row.id]);
 
     const actor: Actor = {
-      sessionId: row.id, userId: row.user_id, mfaVerified: row.mfa_verified,
+      sessionId: row.id, userId: row.user_id, mfaVerified: row.mfa_verified, mustChangePassword: false,
       permissions: new Map(), allBranches: false, branchIds: [], ip,
     };
 
     // The user must still be active.
     const ctxUser = { userId: row.user_id, tenantId: row.active_tenant_id ?? undefined };
     const ok = await this.db.withContext(ctxUser, async (tx) => {
-      const u = await tx.query(`SELECT status FROM users WHERE id = $1`, [row.user_id]);
+      const u = await tx.query(`SELECT status, must_change_password FROM users WHERE id = $1`, [row.user_id]);
       if (u.rows[0]?.status !== 'active') return false;
+      actor.mustChangePassword = u.rows[0].must_change_password;
       if (!row.active_tenant_id) return true;
       const m = await tx.query(
         `SELECT m.id, m.role_id, m.all_branches, r.key AS role_key

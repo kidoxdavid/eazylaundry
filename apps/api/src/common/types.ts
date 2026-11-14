@@ -4,6 +4,7 @@ export interface Actor {
   sessionId: string;
   userId: string;
   mfaVerified: boolean;
+  mustChangePassword: boolean;
   /** Present only when the session has an active, valid membership. */
   tenantId?: string;
   membershipId?: string;
