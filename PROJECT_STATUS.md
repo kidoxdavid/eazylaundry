@@ -3,7 +3,7 @@
 _Last updated: 2026-11-14_
 
 ## Current phase
-**Phase 1 — Platform Foundation: substantially complete, with the open items below.**
+**Phase 1 — Platform Foundation: substantially complete (CI green on GitHub, run #3). Phase 2 — Core Operations: started (money package done).**
 Decisions D1–D5 approved ("go with your recommendations"): dogfood-first launch · Stripe Connect · separate SSR storefront · operational ledger (not a GL) · driver PWA.
 
 ## Test results (local, real PostgreSQL 16)
@@ -15,7 +15,8 @@ Decisions D1–D5 approved ("go with your recommendations"): dogfood-first launc
 | `@eazy/api` auth, sessions, MFA, throttling, temp passwords | 13 | pass |
 | `@eazy/api` RBAC / anti-escalation / branch scope / audit | 7 | pass |
 | `@eazy/api` configuration engine | 4 | pass |
-Total **46/46**. The isolation suite was mutation-checked: disabling RLS on `branches` makes 7 tests fail.
+| `@eazy/money` rounding, allocation, tax (known cases + property tests vs independent oracle) | 16 | pass |
+Total **62/62**. The isolation suite was mutation-checked: disabling RLS on `branches` makes 7 tests fail.
 UI verified by a scripted Playwright run against the real API (register → add branch with server-side validation → add member → audit → sign out). No automated frontend tests yet.
 
 ## Completed (Phase 1)
@@ -27,8 +28,12 @@ UI verified by a scripted Playwright run against the real API (register → add 
 - Tenant registration (tenant + organization + branch + roles + owner in one transaction), branches (Canadian postal validation), members, roles, versioned configuration with branch > tenant > default resolution, audit log written in the same transaction as each change.
 - Web shell (React/Vite/Tailwind/TanStack Query/React Hook Form/Zod): sign in/up, MFA code prompt, forced password change, branches, team, roles (read-only), settings, audit log; permission-aware navigation; business switcher.
 
+## Phase 2 progress
+- `@eazy/money`: bigint minor-unit money, exact decimal rates, rounding modes (half-up/half-even/up/down), largest-remainder allocation, configurable tax engine (multi-component, compound, inclusive/exclusive, line/order rounding). Inclusive pricing preserves the entered total exactly. Not yet wired into any API.
+- Next: customers → services & price lists → server-side pricing engine (using this package) → orders/POS.
+
 ## Not done yet (Phase 1 gaps — honest list)
-- Staging deployment / Terraform baseline; the CI workflow has been written but **not yet run on GitHub**.
+- Staging deployment / Terraform baseline. (CI now runs on GitHub and passes; the first runs failed because `db-bootstrap.sh` mishandled a superuser URL — fixed.)
 - OpenAPI generation + typed client (isolation harness currently enumerates routes via Nest metadata instead).
 - OTel/Sentry observability, Redis/BullMQ worker, outbox dispatcher (table exists, unused).
 - Roles editing UI (API exists), password reset by email, email invitations (temporary passwords are used instead), email verification, MFA enforcement for owners.
@@ -50,8 +55,8 @@ UI verified by a scripted Playwright run against the real API (register → add 
 Stripe Connect account · Email domain auth (SPF/DKIM/DMARC) · Google Maps billing · AWS accounts · Legal docs · Design-partner recruitment · Reference hardware.
 
 ## Next milestones
-1. Close Phase 1 gaps that block Phase 2: OpenAPI + typed client, CI verified green on GitHub, staging deploy.
-2. Phase 2 kickoff: customers, services & price lists, pricing/tax engine (money package first, with property tests).
+1. Phase 2: customers, services & price lists, pricing/tax engine API on top of `@eazy/money`.
+2. Still open from Phase 1: OpenAPI + typed client, staging deploy.
 3. POS → orders → intake → labels/scan → workflow engine → QC/rework → handover → cash shifts.
 
 ## Unverified claims / research debt
