@@ -12,6 +12,7 @@ import type { Actor } from '../common/types.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { DATABASE } from '../db/db.module.js';
 import { quoteSchema } from '../pricing/pricing.controller.js';
+import { WorkflowService, newScanToken } from '../production/workflow.service.js';
 import { PricingService } from '../pricing/pricing.service.js';
 
 const paymentSchema = z.object({
@@ -35,7 +36,8 @@ const cancelSchema = z.object({ reason: z.string().trim().min(3).max(300) });
 const escapeLike = (s: string) => s.split('\\').join('\\\\').split('%').join('\\%').split('_').join('\\_');
 const N = (v: unknown) => Number(v);
 const paymentStatus = (r: any) => (N(r.paid_minor) === 0 ? 'unpaid' : N(r.paid_minor) >= N(r.total_minor) ? 'paid' : 'partial');
-const mapOrder = (r: any) => ({
+export const mapOrder = (r: any) => ({
+  stageKey: r.stage_key ?? null, stageName: r.stage_name ?? null, reworkCount: r.rework_count ?? 0, stageEnteredAt: r.stage_entered_at ?? null,
   id: r.id, orderNo: r.order_no, branchId: r.branch_id, customerId: r.customer_id, customerName: r.customer_name, status: r.status, express: r.express,
   currency: r.currency, priceMode: r.price_mode, subtotalMinor: N(r.subtotal_minor), discountMinor: N(r.discount_minor), netMinor: N(r.net_minor),
   taxMinor: N(r.tax_minor), totalMinor: N(r.total_minor), paidMinor: N(r.paid_minor), balanceMinor: N(r.total_minor) - N(r.paid_minor), paymentStatus: paymentStatus(r),
@@ -49,10 +51,20 @@ const mapLine = (r: any) => ({
 const mapPayment = (r: any) => ({ id: r.id, method: r.method, amountMinor: N(r.amount_minor), tenderedMinor: r.tendered_minor === null ? null : N(r.tendered_minor),
   changeMinor: N(r.change_minor), reference: r.reference, receivedAt: r.received_at, receivedBy: r.received_by });
 
+/** Order with customer name and current stage, under the caller's RLS context (throws 404 when invisible). */
+export async function loadOrder(tx: Tx, id: string) {
+  const o = (await tx.query(
+    `SELECT o.*, c.full_name AS customer_name, ws.key AS stage_key, ws.name AS stage_name FROM orders o
+       JOIN customers c ON c.tenant_id = o.tenant_id AND c.id = o.customer_id
+       LEFT JOIN workflow_stages ws ON ws.tenant_id = o.tenant_id AND ws.id = o.current_stage_id WHERE o.id = $1`, [id])).rows[0];
+  if (!o) throw notFound('Order');
+  return o;
+}
+
 @Controller('orders')
 export class OrdersController {
   constructor(@Inject(DATABASE) private readonly db: Database, @Inject(AuditService) private readonly audit: AuditService,
-              @Inject(PricingService) private readonly pricing: PricingService) {}
+              @Inject(PricingService) private readonly pricing: PricingService, @Inject(WorkflowService) private readonly workflow: WorkflowService) {}
 
   private async event(tx: Tx, a: Actor, order: { id: string; branch_id: string }, type: string, payload: Record<string, unknown> = {}, note?: string) {
     await tx.query(`INSERT INTO order_events (id, tenant_id, branch_id, order_id, type, actor_user_id, note, payload) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
@@ -112,12 +124,24 @@ export class OrdersController {
         // Promised time: longest service turnaround; express is capped at 24h. (Business hours/holidays arrive with the workflow engine.)
         const hours = Math.max(...q.lines.map((l) => { const t = ctx.services.get(l.serviceId)!.turnaroundHours; return l.expressMinor > 0n || (q.express && ctx.services.get(l.serviceId)!.expressCapable) ? Math.min(t, 24) : t; }));
         const id = uuidv7();
-        await tx.query(
-          `INSERT INTO orders (id, tenant_id, branch_id, order_no, customer_id, express, currency, price_mode, subtotal_minor, discount_minor, net_minor, tax_minor, total_minor,
-                               instructions, promised_at, created_by)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now() + make_interval(hours => $15), $16)`,
-          [id, a.tenantId, b.branchId, orderNo, b.customerId, q.express, ctx.currency, q.priceMode, q.subtotalMinor, q.discountMinor, q.netMinor, q.taxMinor, q.totalMinor,
-           b.instructions ?? null, hours, a.userId]);
+        const wf = await this.workflow.ensureDefault(tx, a.tenantId!);
+        // The scan token is the opaque value printed on labels. Retry on the (astronomically rare) collision.
+        for (let attempt = 0; ; attempt++) {
+          try {
+            await tx.query('SAVEPOINT ord');
+            await tx.query(
+              `INSERT INTO orders (id, tenant_id, branch_id, order_no, customer_id, express, currency, price_mode, subtotal_minor, discount_minor, net_minor, tax_minor, total_minor,
+                                   instructions, promised_at, created_by, workflow_definition_id, current_stage_id, scan_token)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now() + make_interval(hours => $15), $16, $17, $18, $19)`,
+              [id, a.tenantId, b.branchId, orderNo, b.customerId, q.express, ctx.currency, q.priceMode, q.subtotalMinor, q.discountMinor, q.netMinor, q.taxMinor, q.totalMinor,
+               b.instructions ?? null, hours, a.userId, wf.definitionId, wf.stages[0].id, newScanToken()]);
+            break;
+          } catch (e: any) {
+            await tx.query('ROLLBACK TO SAVEPOINT ord');
+            if (e.code === '23505' && /scan_token/.test(e.constraint ?? '') && attempt < 5) continue;
+            throw e;
+          }
+        }
         let n = 0;
         for (const l of q.lines) {
           await tx.query(
@@ -153,17 +177,13 @@ export class OrdersController {
       }
       p.push(q.limit, q.offset);
       const r = await tx.query(
-        `SELECT o.*, c.full_name AS customer_name FROM orders o JOIN customers c ON c.tenant_id = o.tenant_id AND c.id = o.customer_id
+        `SELECT o.*, c.full_name AS customer_name, ws.key AS stage_key, ws.name AS stage_name FROM orders o JOIN customers c ON c.tenant_id = o.tenant_id AND c.id = o.customer_id LEFT JOIN workflow_stages ws ON ws.tenant_id = o.tenant_id AND ws.id = o.current_stage_id
           ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY o.created_at DESC, o.id DESC LIMIT $${p.length - 1} OFFSET $${p.length}`, p);
       return { items: r.rows.map(mapOrder) };
     });
   }
 
-  private async load(tx: Tx, id: string) {
-    const o = (await tx.query(`SELECT o.*, c.full_name AS customer_name FROM orders o JOIN customers c ON c.tenant_id = o.tenant_id AND c.id = o.customer_id WHERE o.id = $1`, [id])).rows[0];
-    if (!o) throw notFound('Order');
-    return o;
-  }
+  load(tx: Tx, id: string) { return loadOrder(tx, id); }
 
   @Get(':id')
   @RequirePermission('order.read')

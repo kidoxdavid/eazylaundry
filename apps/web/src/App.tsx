@@ -9,6 +9,8 @@ import { ChangePassword, Login, Register } from './pages/Auth';
 import { OrderDetail, Orders } from './pages/Orders';
 import { Overview } from './pages/Overview';
 import { POS } from './pages/POS';
+import { Production } from './pages/Production';
+import { Scan } from './pages/Scan';
 import { Roles } from './pages/Roles';
 import { Services } from './pages/Services';
 import { Settings } from './pages/Settings';
@@ -44,6 +46,8 @@ function Shell() {
     { to: '/', label: 'Overview', show: true, end: true },
     { to: '/pos', label: 'New order', show: can('order.create') },
     { to: '/orders', label: 'Orders', show: can('order.read') },
+    { to: '/scan', label: 'Scan', show: can('order.read') },
+    { to: '/production', label: 'Production', show: can('order.read') },
     { to: '/customers', label: 'Customers', show: can('customer.read') },
     { to: '/services', label: 'Services', show: can('order.read') },
     { to: '/branches', label: 'Branches', show: can('branch.read') },
@@ -104,6 +108,8 @@ export function App() {
       <Route element={<Shell />}>
         <Route index element={<Overview />} />
         <Route path="pos" element={<POS />} />
+        <Route path="scan" element={<Scan />} />
+        <Route path="production" element={<Production />} />
         <Route path="orders" element={<Orders />} />
         <Route path="orders/:id" element={<OrderDetail />} />
         <Route path="customers" element={<Customers />} />

@@ -3,6 +3,8 @@ import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { get, post } from '../api';
 import { useAuth } from '../auth';
+import { LabelsDialog } from '../components/Labels';
+import { OrderActions, OrderBadges, StageTracker } from '../components/OrderActions';
 import { ReceiptDialog } from '../components/Receipt';
 import { Badge, Button, Dialog, ErrorBanner, Field, Input, PageHeader, Select } from '../components/ui';
 import { METHODS, dateTime, fmt, newKey, toMinor } from '../format';
@@ -35,7 +37,7 @@ export function Orders() {
           <li key={o.id}><Link to={`/orders/${o.id}`} className="block rounded-lg border border-line bg-white p-3 active:bg-surface">
             <div className="flex items-start justify-between gap-2"><span className="font-semibold">{o.orderNo}</span><span className="font-semibold">{fmt(o.totalMinor)}</span></div>
             <div className="text-sm text-muted">{o.customerName}</div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5"><Badge tone={STATUS_TONE[o.status]}>{o.status}</Badge><Badge tone={PAY_TONE[o.paymentStatus]}>{o.paymentStatus}</Badge>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5"><Badge tone={STATUS_TONE[o.status]}>{o.stageName ?? o.status}</Badge><Badge tone={PAY_TONE[o.paymentStatus]}>{o.paymentStatus}</Badge>
               {o.express && <Badge>express</Badge>}{overdue(o) && <Badge tone="danger">overdue</Badge>}</div>
           </Link></li>
         ))}
@@ -48,7 +50,7 @@ export function Orders() {
               <td className="px-3 py-2 font-medium"><Link className="text-accent-strong hover:underline" to={`/orders/${o.id}`} onClick={(e) => e.stopPropagation()}>{o.orderNo}</Link></td>
               <td className="px-3 py-2">{o.customerName}</td><td className="px-3 py-2">{dateTime(o.createdAt)}</td>
               <td className="px-3 py-2">{dateTime(o.promisedAt)} {overdue(o) && <Badge tone="danger">overdue</Badge>}</td>
-              <td className="px-3 py-2"><Badge tone={STATUS_TONE[o.status]}>{o.status}</Badge></td><td className="px-3 py-2"><Badge tone={PAY_TONE[o.paymentStatus]}>{o.paymentStatus}</Badge></td>
+              <td className="px-3 py-2"><Badge tone={STATUS_TONE[o.status]}>{o.stageName ?? o.status}</Badge></td><td className="px-3 py-2"><Badge tone={PAY_TONE[o.paymentStatus]}>{o.paymentStatus}</Badge></td>
               <td className="px-3 py-2 text-right font-medium">{fmt(o.totalMinor)}</td>
             </tr>))}</tbody>
         </table>
@@ -60,18 +62,28 @@ export function Orders() {
 export function OrderDetail() {
   const { id } = useParams(); const { can } = useAuth(); const qc = useQueryClient();
   const q = useQuery({ queryKey: ['order', id], queryFn: () => get(`/orders/${id}`) });
-  const [receipt, setReceipt] = useState(false); const [paying, setPaying] = useState(false); const [cancelling, setCancelling] = useState(false);
-  const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: ['order', id] }), qc.invalidateQueries({ queryKey: ['orders'] })]);
+  const prod = useQuery({ queryKey: ['production', id], queryFn: () => get(`/orders/${id}/production`) });
+  const [receipt, setReceipt] = useState(false); const [paying, setPaying] = useState(false); const [cancelling, setCancelling] = useState(false); const [labels, setLabels] = useState(false);
+  const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: ['order', id] }), qc.invalidateQueries({ queryKey: ['production', id] }), qc.invalidateQueries({ queryKey: ['orders'] }), qc.invalidateQueries({ queryKey: ['board'] })]);
   const o = q.data;
   if (q.error) return <ErrorBanner error={q.error} />;
   if (!o) return <p role="status" className="text-muted">Loading…</p>;
   return (
     <div className="mx-auto max-w-3xl">
       <p className="mb-2 text-sm"><Link className="text-accent underline" to="/orders">← Orders</Link></p>
-      <PageHeader title={o.orderNo} subtitle={`${o.customerName} · created ${dateTime(o.createdAt)}`} action={<Button variant="secondary" onClick={() => setReceipt(true)}>Receipt</Button>} />
+      <PageHeader title={o.orderNo} subtitle={`${o.customerName} · created ${dateTime(o.createdAt)}`}
+        action={<div className="flex gap-2"><Button variant="secondary" onClick={() => setLabels(true)}>Labels</Button><Button variant="secondary" onClick={() => setReceipt(true)}>Receipt</Button></div>} />
       <div className="mb-4 flex flex-wrap gap-1.5"><Badge tone={STATUS_TONE[o.status]}>{o.status}</Badge><Badge tone={PAY_TONE[o.paymentStatus]}>{o.paymentStatus}</Badge>{o.express && <Badge>express</Badge>}
         {overdue(o) && <Badge tone="danger">overdue</Badge>}</div>
       {o.status === 'cancelled' && <p className="mb-4 rounded-md bg-red-50 p-3 text-danger">Cancelled: {o.cancelledReason}</p>}
+
+      {prod.data && (
+        <section className="mb-4 space-y-3 rounded-lg border border-line bg-white p-4" aria-labelledby="prod-h">
+          <div className="flex flex-wrap items-center justify-between gap-2"><h2 id="prod-h" className="font-semibold">Production</h2><OrderBadges o={prod.data} /></div>
+          <StageTracker stages={prod.data.stages} />
+          <OrderActions card={prod.data} onChanged={refresh} />
+        </section>
+      )}
 
       <section className="mb-4 rounded-lg border border-line bg-white p-4"><h2 className="mb-2 font-semibold">Items</h2>
         <ul className="divide-y divide-line">{o.lines.map((l: any) => (
@@ -102,6 +114,7 @@ export function OrderDetail() {
 
       {can('order.cancel') && o.status === 'open' && <Button variant="danger" onClick={() => setCancelling(true)}>Cancel order</Button>}
       {receipt && <ReceiptDialog orderId={o.id} onClose={() => setReceipt(false)} />}
+      {labels && <LabelsDialog orderId={o.id} onClose={() => setLabels(false)} />}
       {paying && <PayDialog order={o} onClose={() => setPaying(false)} onDone={refresh} />}
       {cancelling && <CancelDialog order={o} onClose={() => setCancelling(false)} onDone={refresh} />}
     </div>

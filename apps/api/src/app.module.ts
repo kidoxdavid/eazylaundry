@@ -25,6 +25,8 @@ import { MembersController } from './iam/members.controller.js';
 import { RolesController } from './iam/roles.controller.js';
 import { CatalogueController } from './catalogue/catalogue.controller.js';
 import { OrdersController } from './orders/orders.controller.js';
+import { ProductionController } from './production/production.controller.js';
+import { WorkflowService } from './production/workflow.service.js';
 import { PricingController } from './pricing/pricing.controller.js';
 import { PricingService } from './pricing/pricing.service.js';
 import { CustomersController } from './customers/customers.controller.js';
@@ -38,11 +40,11 @@ export function buildAppModule(cfg: AppConfig) {
       { name: 'default', ttl: 60_000, limit: cfg.throttleLimit },
       { name: 'auth', ttl: 60_000, limit: cfg.authThrottleLimit, skipIf: (ctx) => !Reflect.getMetadata(AUTH_THROTTLE_KEY, ctx.getHandler()) },
     ])],
-    controllers: [HealthController, AuthController, BranchesController, RolesController, MembersController, ConfigController, AuditController, CustomersController, CatalogueController, PricingController, OrdersController],
+    controllers: [HealthController, AuthController, BranchesController, RolesController, MembersController, ConfigController, AuditController, CustomersController, CatalogueController, PricingController, OrdersController, ProductionController],
     providers: [
       { provide: APP_CONFIG, useValue: cfg },
       { provide: FIELD_CIPHER, useValue: new FieldCipher(cfg.encryptionSecret) },
-      AuditService, ConfigService, PricingService, AuthService, PasswordService, SessionService, TenantsService, AuthorizationService,
+      AuditService, ConfigService, PricingService, WorkflowService, AuthService, PasswordService, SessionService, TenantsService, AuthorizationService,
       { provide: APP_GUARD, useClass: ThrottlerGuard },
       { provide: APP_GUARD, useClass: AuthGuard },
       { provide: APP_FILTER, useClass: AllExceptionsFilter },

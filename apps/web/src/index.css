@@ -22,4 +22,12 @@ body { font-size: 14px; color: var(--color-ink); background: var(--color-surface
   .receipt { position: absolute; left: 0; top: 0; width: 80mm; padding: 4mm; font-size: 11px; color: #000; background: #fff; }
   @page { margin: 0; }
 }
+/* Bag labels: one 62×40 mm label per page when printing from the labels dialog. */
+@media print {
+  body:has(.labels) .receipt { display: none; }
+  body:has(.labels) * { visibility: hidden; }
+  .labels, .labels * { visibility: visible !important; }
+  .labels { position: absolute; left: 0; top: 0; width: 62mm; display: block !important; }
+  .label { width: 62mm; height: 40mm; padding: 2mm; border: 0 !important; page-break-after: always; overflow: hidden; }
+}
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
