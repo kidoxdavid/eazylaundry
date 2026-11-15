@@ -1,5 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { authenticator } from 'otplib';
+
+/** Accept the previous and next 30-second code as well (RFC 6238 §5.2): tolerates clock skew and codes that expire while a slow password check runs. */
+const totp = authenticator.clone({ window: 1 });
 import { randomBytes } from 'node:crypto';
 import { Database } from '@eazy/database';
 import { PasswordService } from '../auth/password.service.js';
@@ -35,7 +38,7 @@ export class PlatformAuthService {
     const generic = () => unauthorized('INVALID_CREDENTIALS', 'Invalid email, password or code');
     const u = (await db.withContext({}, (tx) => tx.query(`SELECT * FROM platform_users WHERE email = $1`, [p.email.toLowerCase()]))).rows[0];
     if (!u || u.status !== 'active' || (u.locked_until && new Date(u.locked_until) > new Date())) { await this.pw.fakeVerify(p.password); throw generic(); }
-    const ok = (await this.pw.verify(u.password_hash, p.password)) && authenticator.check(p.totp, this.cipher.decrypt(u.mfa_secret));
+    const ok = (await this.pw.verify(u.password_hash, p.password)) && totp.check(p.totp, this.cipher.decrypt(u.mfa_secret));
     await db.withContext({}, (tx) => tx.query(
       ok ? `UPDATE platform_users SET failed_attempts = 0, locked_until = NULL WHERE id = $1`
          : `UPDATE platform_users SET failed_attempts = failed_attempts + 1, locked_until = CASE WHEN failed_attempts + 1 >= $2 THEN now() + make_interval(mins => $3) ELSE locked_until END WHERE id = $1`,

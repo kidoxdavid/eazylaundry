@@ -1,0 +1,55 @@
+# Staging / single-host deployment: Postgres, one-shot migrations, API and web (nginx). Nothing but the web port is published.
+#   cp .env.staging.example .env.staging   # then replace every CHANGE_ME (openssl rand -hex 24)
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --build
+# Put a TLS-terminating proxy/load balancer in front of the web port; the API trusts exactly one proxy hop (the bundled nginx).
+name: eazylaundry
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD}
+      EAZY_OWNER_PASSWORD: ${EAZY_OWNER_PASSWORD:?}
+      EAZY_APP_PASSWORD: ${EAZY_APP_PASSWORD:?}
+      EAZY_WORKER_PASSWORD: ${EAZY_WORKER_PASSWORD:?}
+      EAZY_PLATFORM_PASSWORD: ${EAZY_PLATFORM_PASSWORD:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infrastructure/docker/init-roles.sh:/docker-entrypoint-initdb.d/10-init-roles.sh:ro
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres -d eazylaundry"], interval: 5s, timeout: 5s, retries: 20 }
+
+  migrate:
+    build: { context: ., dockerfile: infrastructure/docker/api.Dockerfile }
+    restart: "no"
+    depends_on: { postgres: { condition: service_healthy } }
+    working_dir: /app/packages/database
+    command: ["./node_modules/.bin/tsx", "src/migrate-cli.ts"]
+    environment:
+      DATABASE_OWNER_URL: postgres://eazy_owner:${EAZY_OWNER_PASSWORD}@postgres:5432/eazylaundry
+
+  api:
+    build: { context: ., dockerfile: infrastructure/docker/api.Dockerfile }
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://eazy_app:${EAZY_APP_PASSWORD}@postgres:5432/eazylaundry
+      DATABASE_WORKER_URL: postgres://eazy_worker:${EAZY_WORKER_PASSWORD}@postgres:5432/eazylaundry
+      DATABASE_PLATFORM_URL: postgres://eazy_platform:${EAZY_PLATFORM_PASSWORD}@postgres:5432/eazylaundry
+      APP_ENCRYPTION_SECRET: ${APP_ENCRYPTION_SECRET:?set APP_ENCRYPTION_SECRET}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:?set PUBLIC_WEB_URL}
+      MAIL_FROM: ${MAIL_FROM:-EazyLaundry <no-reply@localhost>}
+      SMTP_URL: ${SMTP_URL:-}
+    # no published ports: only nginx can reach the API
+
+  web:
+    build: { context: ., dockerfile: infrastructure/docker/web.Dockerfile }
+    restart: unless-stopped
+    depends_on: { api: { condition: service_healthy } }
+    ports: ["${WEB_PORT:-8080}:8080"]
+    healthcheck: { test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"], interval: 10s, timeout: 3s, retries: 6 }
+
+volumes: { pgdata: {} }

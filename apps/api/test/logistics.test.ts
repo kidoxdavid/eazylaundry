@@ -213,6 +213,11 @@ describe('pickup, delivery and the driver', () => {
     await postKey(s.t.client, `/orders/${d2.orderId}/payments`, { method: 'card_external', amountMinor: 2625 });
     expect((await act(driver.client, d2.taskId, 'complete', { proof: { type: 'left_at_door', note: 'x' } })).status).toBe(400); // note too short
     expect((await act(driver.client, d2.taskId, 'complete', { proof: { type: 'left_at_door', note: 'Left with concierge' } })).body.status).toBe('completed');
+    // "Done today" follows when the driver FINISHED the task, not when it was scheduled (this task's window is 1-3 hours ahead).
+    const around = `from=${encodeURIComponent(new Date(Date.now() - 60_000).toISOString())}&to=${encodeURIComponent(new Date(Date.now() + 60_000).toISOString())}`;
+    expect(((await driver.client.get(`/driver/tasks?${around}`)).body.items as any[]).map((x) => x.id)).toContain(d2.taskId);
+    const earlier = `from=${encodeURIComponent(new Date(Date.now() - 3 * 3600_000).toISOString())}&to=${encodeURIComponent(new Date(Date.now() - 2 * 3600_000).toISOString())}`;
+    expect(((await driver.client.get(`/driver/tasks?${earlier}`)).body.items as any[]).map((x) => x.id)).not.toContain(d2.taskId);
     expect((await dispatcher.client.get(`/delivery-tasks/${d2.taskId}`)).body.proof).toMatchObject({ type: 'left_at_door', note: 'Left with concierge' });
   });
 

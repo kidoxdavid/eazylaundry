@@ -312,7 +312,8 @@ export class LogisticsController {
   mine(@CurrentActor() a: Actor, @Query(new ZodPipe(driverQuery)) q: z.infer<typeof driverQuery>) {
     return this.db.withContext(dbCtx(a), async (tx) => {
       const p: unknown[] = [a.userId]; let doneClause = 'false';
-      if (q.from && q.to) { p.push(q.from, q.to); doneClause = `(t.status IN ('completed','failed') AND t.window_end >= $2 AND t.window_start < $3)`; }
+      // "Done" follows when the task was finished, not when it was scheduled.
+      if (q.from && q.to) { p.push(q.from, q.to); doneClause = `(t.status IN ('completed','failed') AND coalesce(t.completed_at, t.updated_at) >= $2 AND coalesce(t.completed_at, t.updated_at) < $3)`; }
       const r = await tx.query(`${TASK_SELECT} WHERE t.assigned_to = $1 AND (t.status IN ('assigned','en_route') OR ${doneClause}) ORDER BY t.window_start, t.id LIMIT 200`, p);
       return { items: r.rows.map((x) => this.view(x, { forDriver: true })) };
     });

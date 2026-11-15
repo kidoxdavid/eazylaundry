@@ -244,6 +244,17 @@ describe('platform realm: authentication, roles and audit', () => {
     expect((await thief.get('/platform/auth/me')).status).toBe(401);
   });
 
+  it('authenticator codes tolerate one 30-second step of clock skew either way, but no more', async () => {
+    const email = `skew-${randomUUID().slice(0, 8)}@eazy.test`;
+    const u = await app.get(PlatformAuthService).createUser({ email, fullName: 'Skew Test', password: PW, role: 'support_agent' });
+    const at = (offsetMs: number) => authenticator.clone({ epoch: Date.now() + offsetMs }).generate(u.mfaSecret);
+    const login = (totp: string) => new Client(app).post('/platform/auth/login', { email, password: PW, totp });
+    expect((await login(at(-30_000))).status).toBe(200);   // previous step
+    expect((await login(at(+30_000))).status).toBe(200);   // next step
+    expect((await login(at(-90_000))).status).toBe(401);   // three steps ago
+    expect((await login(at(+90_000))).status).toBe(401);
+  });
+
   it('roles: support agents read only; billing ops manage subscriptions but not plans; admins do everything; every change is audited', async () => {
     const admin = await operator(app); const billing = await operator(app, 'billing_ops'); const agent = await operator(app, 'support_agent');
     const t = await registerTenant(app);

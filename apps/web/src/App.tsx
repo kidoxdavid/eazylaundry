@@ -1,31 +1,39 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState, type ComponentType } from 'react';
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth';
+import { BillingBanner } from './components/BillingBanner';
 import { Icon, Logo, type IconName } from './components/icons';
-import { Audit } from './pages/Audit';
-import { Billing, BillingBanner } from './pages/Billing';
-import { PlatformApp } from './platform/PlatformApp';
-import { Branches } from './pages/Branches';
-import { CustomerDetail, Customers } from './pages/Customers';
+import { ListSkeleton } from './components/ui';
+
 import { ChangePassword, Login, Register } from './pages/Auth';
 import { OrderDetail, Orders } from './pages/Orders';
-import { Storefront } from './storefront/Storefront';
-import { Dispatch } from './pages/Dispatch';
-import { Driver } from './pages/Driver';
 import { Overview } from './pages/Overview';
 import { POS } from './pages/POS';
-import { Production } from './pages/Production';
-import { Reports } from './pages/Reports';
-import { Refunds } from './pages/Refunds';
-import { Scan } from './pages/Scan';
-import { Till } from './pages/Till';
-import { Zones } from './pages/Zones';
-import { Roles } from './pages/Roles';
-import { Services } from './pages/Services';
-import { Settings } from './pages/Settings';
-import { Team } from './pages/Team';
 import { post } from './api';
 import { useQueryClient } from '@tanstack/react-query';
+
+/** Route-level code splitting: a customer opening the storefront never downloads the staff or platform consoles. */
+function page<T extends Record<string, unknown>>(load: () => Promise<T>, name: keyof T) { return lazy(() => load().then((m) => ({ default: m[name] as ComponentType<any> }))); }
+const Audit = page(() => import('./pages/Audit'), 'Audit');
+const Billing = page(() => import('./pages/Billing'), 'Billing');
+const Branches = page(() => import('./pages/Branches'), 'Branches');
+const Customers = page(() => import('./pages/Customers'), 'Customers');
+const CustomerDetail = page(() => import('./pages/Customers'), 'CustomerDetail');
+const Dispatch = page(() => import('./pages/Dispatch'), 'Dispatch');
+const Driver = page(() => import('./pages/Driver'), 'Driver');
+const Production = page(() => import('./pages/Production'), 'Production');
+const Refunds = page(() => import('./pages/Refunds'), 'Refunds');
+const Reports = page(() => import('./pages/Reports'), 'Reports');
+const Scan = page(() => import('./pages/Scan'), 'Scan');
+const Till = page(() => import('./pages/Till'), 'Till');
+const Zones = page(() => import('./pages/Zones'), 'Zones');
+const Roles = page(() => import('./pages/Roles'), 'Roles');
+const Services = page(() => import('./pages/Services'), 'Services');
+const Settings = page(() => import('./pages/Settings'), 'Settings');
+const Team = page(() => import('./pages/Team'), 'Team');
+const Storefront = page(() => import('./storefront/Storefront'), 'Storefront');
+const PlatformApp = page(() => import('./platform/PlatformApp'), 'PlatformApp');
+const Loading = () => <div className="p-4"><ListSkeleton /></div>;
 
 type NavItem = { to: string; label: string; icon: IconName; section: string; show: boolean; end?: boolean };
 
@@ -125,7 +133,7 @@ function Shell() {
         <div className="px-5 py-5">{brand}</div>
         <NavItems items={items} />{account}
       </aside>
-      <main className="min-w-0 flex-1 overflow-auto p-4 pb-24 md:p-8 md:pb-8"><BillingBanner me={me} /><div key={loc.pathname} className="page-enter"><Outlet /></div></main>
+      <main className="min-w-0 flex-1 overflow-auto p-4 pb-24 md:p-8 md:pb-8"><BillingBanner me={me} /><div key={loc.pathname} className="page-enter"><Suspense fallback={<ListSkeleton />}><Outlet /></Suspense></div></main>
       <nav aria-label="Quick navigation" className="safe-bottom fixed inset-x-0 bottom-0 z-30 grid border-t border-line bg-white/95 backdrop-blur md:hidden print:hidden" style={{ gridTemplateColumns: `repeat(${tabs.length + 1}, minmax(0, 1fr))` }}>
         {tabs.map((t) => (
           <NavLink key={t.to} to={t.to} end={t.end} className={({ isActive }) => `flex h-16 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition active:scale-95 ${isActive ? 'text-accent' : 'text-muted'}`}>
@@ -143,9 +151,9 @@ export function App() {
   const { loading } = useAuth();
   const loc = useLocation();
   // The platform console is its own realm (separate sign-in and session); it never waits on staff authentication.
-  if (loc.pathname.startsWith('/platform')) return <Routes><Route path="/platform/*" element={<PlatformApp />} /></Routes>;
+  if (loc.pathname.startsWith('/platform')) return <Suspense fallback={<Loading />}><Routes><Route path="/platform/*" element={<PlatformApp />} /></Routes></Suspense>;
   // The customer storefront is a separate app surface with its own sign-in; it never waits on staff authentication.
-  if (loc.pathname.startsWith('/b/')) return <Routes><Route path="/b/:slug/*" element={<Storefront />} /></Routes>;
+  if (loc.pathname.startsWith('/b/')) return <Suspense fallback={<Loading />}><Routes><Route path="/b/:slug/*" element={<Storefront />} /></Routes></Suspense>;
   if (loading) return <div className="p-8 text-muted" role="status">Loading…</div>;
   return (
     <Routes>

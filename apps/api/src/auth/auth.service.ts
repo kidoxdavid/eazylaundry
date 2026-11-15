@@ -1,5 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { authenticator } from 'otplib';
+
+/** Accept the previous and next 30-second code as well (RFC 6238 §5.2): tolerates clock skew and codes that expire while a slow password check runs. */
+const totp = authenticator.clone({ window: 1 });
 import { Database } from '@eazy/database';
 import { AuditService } from '../audit/audit.service.js';
 import { FieldCipher } from '../common/crypto.js';
@@ -41,7 +44,7 @@ export class AuthService {
     if (u.mfa_enabled) {
       if (!p.totp) throw unauthorized('MFA_REQUIRED', 'A verification code is required');
       const secret = this.cipher.decrypt(u.mfa_secret);
-      if (!authenticator.check(p.totp, secret)) {
+      if (!totp.check(p.totp, secret)) {
         await this.db.pool.query(`SELECT auth_record_login($1,false,$2,$3)`, [u.id, this.cfg.maxFailedLogins, this.cfg.lockMinutes]);
         throw unauthorized('MFA_INVALID', 'Invalid verification code');
       }

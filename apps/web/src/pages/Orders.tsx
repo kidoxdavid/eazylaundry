@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { Suspense, lazy, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError, get, post } from '../api';
 import { useAuth } from '../auth';
-import { LabelsDialog } from '../components/Labels';
 import { OrderActions, OrderBadges, StageTracker } from '../components/OrderActions';
 import { ReceiptDialog } from '../components/Receipt';
 import { Badge, Button, Dialog, ErrorBanner, Field, Input, PageHeader, Select } from '../components/ui';
 import { METHODS, dateTime, fmt, newKey, toMinor } from '../format';
+// Barcode/QR libraries are only needed when labels are opened, so they load on demand.
+const LabelsDialog = lazy(() => import('../components/Labels').then((m) => ({ default: m.LabelsDialog })));
 
 const STATUS_TONE: Record<string, 'neutral' | 'success' | 'warning' | 'danger'> = { open: 'warning', ready: 'success', completed: 'success', cancelled: 'danger' };
 const PAY_TONE: Record<string, 'neutral' | 'success' | 'warning' | 'danger'> = { unpaid: 'danger', partial: 'warning', paid: 'success' };
@@ -131,7 +132,7 @@ export function OrderDetail() {
 
       {can('order.cancel') && o.status === 'open' && <Button variant="danger" onClick={() => setCancelling(true)}>Cancel order</Button>}
       {receipt && <ReceiptDialog orderId={o.id} onClose={() => setReceipt(false)} />}
-      {labels && <LabelsDialog orderId={o.id} onClose={() => setLabels(false)} />}
+      {labels && <Suspense fallback={null}><LabelsDialog orderId={o.id} onClose={() => setLabels(false)} /></Suspense>}
       {paying && <PayDialog order={o} onClose={() => setPaying(false)} onDone={refresh} />}
       {refunding && <RefundDialog order={o} payment={refunding} onClose={() => setRefunding(null)} onDone={refresh} />}
       {cancelling && <CancelDialog order={o} onClose={() => setCancelling(false)} onDone={refresh} />}
