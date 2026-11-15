@@ -4,6 +4,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { ACCESS_KEY, type Access } from '../common/access.js';
 import { forbidden, unauthorized } from '../common/errors.js';
 import type { AppRequest } from '../common/types.js';
+import { CCSRF_COOKIE, CSID_COOKIE, CustomerSessionService } from '../portal/customer-session.service.js';
 import { CSRF_COOKIE, SID_COOKIE, SessionService } from './session.service.js';
 
 const SAFE = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -17,7 +18,8 @@ function safeEq(a?: string, b?: string) {
 /** Global, fail-closed guard: a route without an access declaration is denied. */
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(@Inject(Reflector) private readonly reflector: Reflector, @Inject(SessionService) private readonly sessions: SessionService) {}
+  constructor(@Inject(Reflector) private readonly reflector: Reflector, @Inject(SessionService) private readonly sessions: SessionService,
+              @Inject(CustomerSessionService) private readonly customerSessions: CustomerSessionService) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const access = this.reflector.getAllAndOverride<Access | undefined>(ACCESS_KEY, [ctx.getHandler(), ctx.getClass()]);
@@ -25,6 +27,16 @@ export class AuthGuard implements CanActivate {
     if (access.kind === 'public') return true;
 
     const req = ctx.switchToHttp().getRequest<AppRequest>();
+    if (access.kind === 'customer') {
+      // Storefront customers: their own cookie + session store. A staff session never satisfies this, and vice versa.
+      const ctoken = req.cookies?.[CSID_COOKIE];
+      if (!ctoken) throw unauthorized();
+      const customer = await this.customerSessions.resolve(ctoken);
+      if (!customer) throw unauthorized('SESSION_INVALID', 'Session expired or invalid');
+      if (!SAFE.has(req.method) && !safeEq(req.headers['x-csrf-token'] as string | undefined, req.cookies?.[CCSRF_COOKIE])) throw forbidden('CSRF', 'Missing or invalid CSRF token');
+      req.customer = customer;
+      return true;
+    }
     const token = req.cookies?.[SID_COOKIE];
     if (!token) throw unauthorized();
     const actor = await this.sessions.resolve(token, req.ip);

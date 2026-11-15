@@ -12,6 +12,7 @@ import type { Actor } from '../common/types.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { DATABASE } from '../db/db.module.js';
 import { ConfigService } from '../config/config.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { TasksService, windowSchema } from '../logistics/tasks.service.js';
 import { quoteSchema } from '../pricing/pricing.controller.js';
 import { WorkflowService, newScanToken } from '../production/workflow.service.js';
@@ -70,7 +71,7 @@ export class OrdersController {
   constructor(@Inject(DATABASE) private readonly db: Database, @Inject(AuditService) private readonly audit: AuditService,
               @Inject(PricingService) private readonly pricing: PricingService, @Inject(WorkflowService) private readonly workflow: WorkflowService,
               @Inject(ConfigService) private readonly cfg: ConfigService,
-              @Inject(TasksService) private readonly tasks: TasksService) {}
+              @Inject(TasksService) private readonly tasks: TasksService, @Inject(NotificationsService) private readonly notify: NotificationsService) {}
 
   private async event(tx: Tx, a: Actor, order: { id: string; branch_id: string }, type: string, payload: Record<string, unknown> = {}, note?: string) {
     await tx.query(`INSERT INTO order_events (id, tenant_id, branch_id, order_id, type, actor_user_id, note, payload) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
@@ -121,7 +122,7 @@ export class OrdersController {
     if (b.payment && !a.permissions.has('payment.take')) throw forbidden('PERMISSION_DENIED', 'Missing permission: payment.take');
     return this.db.withContext(dbCtx(a), async (tx) => {
       const { replayed, response } = await once(tx, a.tenantId!, 'order.create', key, hashRequest(b), async () => {
-        const cust = (await tx.query(`SELECT id, archived_at FROM customers WHERE id = $1`, [b.customerId])).rows[0];
+        const cust = (await tx.query(`SELECT id, archived_at, email, full_name FROM customers WHERE id = $1`, [b.customerId])).rows[0];
         if (!cust) throw notFound('Customer');
         if (cust.archived_at) throw new AppError(422, 'CUSTOMER_ARCHIVED', 'This customer is archived');
 
@@ -168,15 +169,27 @@ export class OrdersController {
              l.expressMinor, l.discountMinor, l.netMinor, l.taxMinor, l.totalMinor, JSON.stringify(Object.fromEntries(Object.entries(l.taxByComponent).map(([k, v]) => [k, Number(v)]))),
              ctx.services.get(l.serviceId)!.turnaroundHours]);
         }
-        let deliveryTaskId: string | null = null;
+        let deliveryTaskId: string | null = null; let deliveryOtp: string | null = null;
         if (ctx.delivery) {
           const cust = (await tx.query(`SELECT full_name, phone, (SELECT 1 FROM customer_addresses WHERE id = $2 AND customer_id = $1) AS owns FROM customers WHERE id = $1`, [b.customerId, b.deliveryAddressId])).rows[0];
           if (!cust.owns) throw new AppError(422, 'ADDRESS_NOT_CUSTOMERS', 'That address does not belong to this customer');
-          deliveryTaskId = await this.tasks.create(tx, a, { branchId: b.branchId, kind: 'delivery', orderId: id, customerId: b.customerId, zoneId: ctx.delivery.zoneId,
+          const created = await this.tasks.create(tx, a, { branchId: b.branchId, kind: 'delivery', orderId: id, customerId: b.customerId, zoneId: ctx.delivery.zoneId,
             window: b.deliveryWindow!, address: ctx.delivery.address, postalCode: ctx.delivery.postalCode, contactName: cust.full_name, contactPhone: cust.phone, notes: null, feeMinor: ctx.delivery.feeMinor });
+          deliveryTaskId = created.id; deliveryOtp = created.otp;
         }
         await this.event(tx, a, { id, branch_id: b.branchId }, 'order.created', { orderNo, totalMinor: Number(q.totalMinor), lines: q.lines.length });
         await this.audit.record(tx, a, { action: 'order.created', entityType: 'order', entityId: id, branchId: b.branchId, detail: { orderNo, totalMinor: Number(q.totalMinor) } });
+        const brand = await this.notify.brand(tx);
+        const tz = (await tx.query(`SELECT to_char((o.promised_at AT TIME ZONE br.timezone), 'Mon DD HH24:MI') AS ready_by,
+                                           to_char(($2::timestamptz AT TIME ZONE br.timezone), 'Mon DD HH24:MI') || '–' || to_char(($3::timestamptz AT TIME ZONE br.timezone), 'HH24:MI') AS win
+                                      FROM orders o JOIN branches br ON br.id = o.branch_id WHERE o.id = $1`, [id, b.deliveryWindow?.start ?? null, b.deliveryWindow?.end ?? null])).rows[0];
+        await this.notify.enqueue(tx, { tenantId: a.tenantId!, customerId: b.customerId, orderId: id, to: cust.email, template: 'order.received', dedupeKey: `order.received:${id}`,
+          vars: { name: cust.full_name, orderNo, totalMinor: Number(q.totalMinor), readyBy: tz.ready_by, url: `${brand.base}/orders/${id}` } });
+        if (ctx.delivery && deliveryOtp) {
+          const ad = ctx.delivery.address as any;
+          await this.notify.enqueue(tx, { tenantId: a.tenantId!, customerId: b.customerId, orderId: id, taskId: deliveryTaskId!, to: cust.email, template: 'delivery.scheduled', dedupeKey: `delivery.scheduled:${deliveryTaskId}`,
+            vars: { name: cust.full_name, orderNo, window: tz.win, address: [ad.line1, ad.line2, ad.city, ad.province, ad.postalCode].filter(Boolean).join(', '), code: deliveryOtp, url: `${brand.base}/orders/${id}` } });
+        }
         const pay = b.payment ? await this.applyPayment(tx, a, id, b.payment) : null;
         return { id, orderNo, totalMinor: Number(q.totalMinor), paidMinor: pay ? b.payment!.amountMinor : 0, changeMinor: pay?.changeMinor ?? 0, deliveryTaskId };
       });
@@ -258,8 +271,13 @@ export class OrdersController {
   @Get(':id/receipt')
   @RequirePermission('order.read')
   receipt(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string) {
-    return this.db.withContext(dbCtx(a), async (tx) => {
-      const o = await this.load(tx, id);
+    return this.db.withContext(dbCtx(a), (tx) => buildReceipt(tx, id));
+  }
+}
+
+/** Receipt data for an order visible to the caller's RLS context (staff, or a customer's own order in the portal). */
+export async function buildReceipt(tx: Tx, id: string) {
+      const o = await loadOrder(tx, id);
       const lines = (await tx.query(`SELECT * FROM order_lines WHERE order_id = $1 ORDER BY line_no`, [id])).rows.map(mapLine);
       const pays = (await tx.query(`SELECT p.* FROM payments p JOIN payment_allocations pa ON pa.tenant_id = p.tenant_id AND pa.payment_id = p.id WHERE pa.order_id = $1 ORDER BY p.received_at`, [id])).rows.map(mapPayment);
       const br = (await tx.query(`SELECT b.name, b.address, b.timezone, to_char(($2::timestamptz AT TIME ZONE b.timezone), 'YYYY-MM-DD HH24:MI') AS local_time,
@@ -272,6 +290,4 @@ export class OrdersController {
       return { business: br.legal_name, branch: br.name, address: br.address, orderNo: m.orderNo, dateLocal: br.local_time, timezone: br.timezone, customerName: m.customerName,
         express: m.express, currency: m.currency, priceMode: m.priceMode, lines, subtotalMinor: m.subtotalMinor, deliveryFeeMinor: m.deliveryFeeMinor, discountMinor: m.discountMinor, taxByComponent, taxMinor: m.taxMinor,
         totalMinor: m.totalMinor, payments: pays, paidMinor: m.paidMinor, balanceMinor: m.balanceMinor, promisedAt: m.promisedAt, promisedLocal: br.promised_local, instructions: m.instructions, status: m.status };
-    });
-  }
 }

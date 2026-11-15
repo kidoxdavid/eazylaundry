@@ -62,6 +62,7 @@ export function Orders() {
 export function OrderDetail() {
   const { id } = useParams(); const { can } = useAuth(); const qc = useQueryClient();
   const q = useQuery({ queryKey: ['order', id], queryFn: () => get(`/orders/${id}`) });
+  const notes = useQuery({ queryKey: ['notifications', id], enabled: can('customer.read'), queryFn: () => get(`/notifications?orderId=${id}`) });
   const prod = useQuery({ queryKey: ['production', id], queryFn: () => get(`/orders/${id}/production`) });
   const [refunding, setRefunding] = useState<any>(null);
   const [receipt, setReceipt] = useState(false); const [paying, setPaying] = useState(false); const [cancelling, setCancelling] = useState(false); const [labels, setLabels] = useState(false);
@@ -117,6 +118,13 @@ export function OrderDetail() {
             <div className="text-sm text-muted">{dateTime(p.receivedAt)}{p.changeMinor ? ` · change ${fmt(p.changeMinor)}` : ''}{p.refundedMinor ? ` · refunded ${fmt(p.refundedMinor)}` : ''}</div></div>
             <div className="flex items-center gap-2"><span className="font-medium">{fmt(p.amountMinor)}</span>
               {can('payment.refund.request') && p.refundableMinor > 0 && <Button variant="secondary" className="h-9 px-3 md:h-8" onClick={() => setRefunding(p)}>Refund</Button>}</div></li>))}</ul></section>
+
+      {notes.data?.items.length > 0 && (
+        <section className="mb-4 rounded-lg border border-line bg-white p-4" aria-label="Messages to the customer"><h2 className="mb-2 font-semibold">Messages to the customer</h2>
+          <ul className="divide-y divide-line text-sm">{notes.data.items.map((n: any) => (
+            <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><div><div>{n.subject}</div><div className="text-xs text-muted">{n.to ?? 'no email address'}{n.error && n.status !== 'sent' ? ` · ${n.error}` : ''}</div></div>
+              <Badge tone={n.status === 'sent' ? 'success' : n.status === 'failed' ? 'danger' : n.status === 'queued' || n.status === 'sending' ? 'neutral' : 'warning'}>{n.status === 'logged' ? 'not delivered' : n.status}</Badge></li>))}</ul></section>
+      )}
 
       <section className="mb-4 rounded-lg border border-line bg-white p-4"><h2 className="mb-2 font-semibold">History</h2>
         <ol className="space-y-1 text-sm">{o.events.map((e: any) => <li key={e.id} className="flex flex-wrap gap-x-2"><span className="text-muted">{dateTime(e.occurredAt)}</span><span className="font-medium">{e.type.replace('.', ' ')}</span>{e.note && <span>— {e.note}</span>}</li>)}</ol></section>

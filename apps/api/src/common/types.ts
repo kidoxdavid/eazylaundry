@@ -20,5 +20,11 @@ export interface Actor {
 
 export interface AppRequest extends Request {
   actor?: Actor;
+  customer?: CustomerActor;
   requestId?: string;
+}
+
+/** A signed-in customer (storefront/portal realm). Entirely separate from staff sessions. */
+export interface CustomerActor {
+  sessionId: string; accountId: string; customerId: string; tenantId: string; email: string;
 }

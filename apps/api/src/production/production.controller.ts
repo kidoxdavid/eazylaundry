@@ -11,6 +11,7 @@ import type { Actor } from '../common/types.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { DATABASE } from '../db/db.module.js';
 import { loadOrder, mapOrder } from '../orders/orders.controller.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { REASON_CODES, SCAN_TOKEN_RE, WorkflowService, type StageRow } from './workflow.service.js';
 
 const advanceSchema = z.object({ fromStageKey: z.string().min(2).max(31), toStageKey: z.string().min(2).max(31).optional(), note: z.string().trim().max(300).optional() });
@@ -27,7 +28,8 @@ type Action = { kind: 'advance' | 'qc' | 'handover' | 'none'; label: string; toS
 @Controller()
 export class ProductionController {
   constructor(@Inject(DATABASE) private readonly db: Database, @Inject(AuditService) private readonly audit: AuditService,
-              @Inject(WorkflowService) private readonly workflow: WorkflowService) {}
+              @Inject(WorkflowService) private readonly workflow: WorkflowService,
+              @Inject(NotificationsService) private readonly notify: NotificationsService) {}
 
   private async event(tx: Tx, a: Actor, o: { id: string; branch_id: string }, type: string, payload: Record<string, unknown> = {}, note?: string) {
     await tx.query(`INSERT INTO order_events (id, tenant_id, branch_id, order_id, type, actor_user_id, note, payload) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
@@ -109,7 +111,16 @@ export class ProductionController {
   private async moveTo(tx: Tx, a: Actor, o: any, from: StageRow, to: StageRow, extra: Record<string, unknown> = {}, note?: string) {
     await tx.query(`UPDATE orders SET current_stage_id = $2, stage_entered_at = now(), status = $3, version = version + 1, updated_at = now() WHERE id = $1`, [o.id, to.id, to.orderStatus]);
     await this.event(tx, a, o, 'stage.changed', { from: from.key, to: to.key, ...extra }, note);
-    if (to.orderStatus === 'ready') await this.event(tx, a, o, 'order.ready');
+    if (to.orderStatus === 'ready') {
+      await this.event(tx, a, o, 'order.ready');
+      const c = (await tx.query(`SELECT c.email, c.full_name, b.name AS branch,
+                                        (SELECT to_char((t.window_start AT TIME ZONE b.timezone), 'Mon DD HH24:MI') || '–' || to_char((t.window_end AT TIME ZONE b.timezone), 'HH24:MI')
+                                           FROM delivery_tasks t WHERE t.order_id = o.id AND t.kind = 'delivery' AND t.status NOT IN ('cancelled','failed') ORDER BY t.created_at DESC LIMIT 1) AS delivery
+                                   FROM orders o JOIN customers c ON c.tenant_id = o.tenant_id AND c.id = o.customer_id JOIN branches b ON b.id = o.branch_id WHERE o.id = $1`, [o.id])).rows[0];
+      const brand = await this.notify.brand(tx);
+      await this.notify.enqueue(tx, { tenantId: a.tenantId!, customerId: o.customer_id, orderId: o.id, to: c.email, template: 'order.ready', dedupeKey: `order.ready:${o.id}`,
+        vars: { name: c.full_name, orderNo: o.order_no, branch: c.branch, delivery: c.delivery, url: `${brand.base}/orders/${o.id}` } });
+    }
     if (to.orderStatus === 'completed') {
       await this.event(tx, a, o, 'order.handed_over', {}, note);
       await this.audit.record(tx, a, { action: 'order.handed_over', entityType: 'order', entityId: o.id, branchId: o.branch_id, detail: { note } });

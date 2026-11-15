@@ -7,6 +7,7 @@ import { Branches } from './pages/Branches';
 import { CustomerDetail, Customers } from './pages/Customers';
 import { ChangePassword, Login, Register } from './pages/Auth';
 import { OrderDetail, Orders } from './pages/Orders';
+import { Storefront } from './storefront/Storefront';
 import { Dispatch } from './pages/Dispatch';
 import { Driver } from './pages/Driver';
 import { Overview } from './pages/Overview';
@@ -110,6 +111,9 @@ function Shell() {
 
 export function App() {
   const { loading } = useAuth();
+  const loc = useLocation();
+  // The customer storefront is a separate app surface with its own sign-in; it never waits on staff authentication.
+  if (loc.pathname.startsWith('/b/')) return <Routes><Route path="/b/:slug/*" element={<Storefront />} /></Routes>;
   if (loading) return <div className="p-8 text-muted" role="status">Loading…</div>;
   return (
     <Routes>

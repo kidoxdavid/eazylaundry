@@ -12,6 +12,7 @@ import type { Actor } from '../common/types.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { DATABASE } from '../db/db.module.js';
 import { WorkflowService } from '../production/workflow.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { TasksService, windowSchema } from './tasks.service.js';
 import { ZonesService, compactPostal } from './zones.service.js';
 
@@ -44,6 +45,7 @@ const failSchema = z.object({ reason: z.enum(['no_answer', 'wrong_address', 'ref
 
 const MAX_OTP_ATTEMPTS = 5;
 const N = (v: unknown) => Number(v);
+const addressLine = (a: { line1: string; line2?: string | null; city: string; province: string; postal_code: string }) => [a.line1, a.line2, a.city, a.province, a.postal_code].filter(Boolean).join(', ');
 const isDispatcher = (a: Actor) => a.permissions.has('delivery.dispatch');
 const mapZone = (r: any) => ({ id: r.id, name: r.name, postalPrefixes: r.postal_prefixes, minOrderMinor: N(r.min_order_minor), feeMinor: N(r.fee_minor),
   freeOverMinor: r.free_over_minor === null ? null : N(r.free_over_minor), taxable: r.taxable, active: r.active });
@@ -60,7 +62,14 @@ export class LogisticsController {
   constructor(
     @Inject(DATABASE) private readonly db: Database, @Inject(AuditService) private readonly audit: AuditService, @Inject(ZonesService) private readonly zones: ZonesService,
     @Inject(TasksService) private readonly tasks: TasksService, @Inject(WorkflowService) private readonly workflow: WorkflowService,
+    @Inject(NotificationsService) private readonly notify: NotificationsService,
   ) {}
+
+  /** "Nov 16 08:00–10:00" in the branch's own time zone. */
+  private async windowText(tx: Tx, branchId: string, w: { start: string; end: string }) {
+    return (await tx.query(`SELECT to_char(($2::timestamptz AT TIME ZONE b.timezone), 'Mon DD HH24:MI') || '–' || to_char(($3::timestamptz AT TIME ZONE b.timezone), 'HH24:MI') AS t FROM branches b WHERE b.id = $1`,
+      [branchId, w.start, w.end])).rows[0].t as string;
+  }
 
   // ------------------------------------------------------------------ zones
   @Get('delivery-zones')
@@ -156,17 +165,20 @@ export class LogisticsController {
       if (!canAccessBranch(a, b.branchId)) throw notFound('Branch');
       const br = (await tx.query(`SELECT status FROM branches WHERE id = $1`, [b.branchId])).rows[0];
       if (!br || br.status !== 'active') throw notFound('Branch');
-      const c = (await tx.query(`SELECT full_name, phone, archived_at FROM customers WHERE id = $1`, [b.customerId])).rows[0];
+      const c = (await tx.query(`SELECT full_name, phone, email, archived_at FROM customers WHERE id = $1`, [b.customerId])).rows[0];
       if (!c) throw notFound('Customer');
       if (c.archived_at) throw new AppError(422, 'CUSTOMER_ARCHIVED', 'This customer is archived');
       const ad = (await tx.query(`SELECT line1, line2, city, province, postal_code, delivery_instructions FROM customer_addresses WHERE id = $1 AND customer_id = $2`, [b.addressId, b.customerId])).rows[0];
       if (!ad) throw notFound('Address');
       const zone = await this.zones.resolve(tx, ad.postal_code);
       if (!zone) throw new AppError(422, 'OUT_OF_ZONE', 'We do not pick up from this address');
-      const id = await this.tasks.create(tx, a, { branchId: b.branchId, kind: 'pickup', orderId: null, customerId: b.customerId, zoneId: zone.id, window: b.window,
+      const { id } = await this.tasks.create(tx, a, { branchId: b.branchId, kind: 'pickup', orderId: null, customerId: b.customerId, zoneId: zone.id, window: b.window,
         address: { line1: ad.line1, line2: ad.line2, city: ad.city, province: ad.province, postalCode: ad.postal_code, instructions: ad.delivery_instructions }, postalCode: ad.postal_code,
         contactName: c.full_name, contactPhone: c.phone, notes: b.notes ?? null, feeMinor: 0n });
       await this.audit.record(tx, a, { action: 'pickup.booked', entityType: 'delivery_task', entityId: id, branchId: b.branchId });
+      const brand = await this.notify.brand(tx);
+      await this.notify.enqueue(tx, { tenantId: a.tenantId!, customerId: b.customerId, taskId: id, to: c.email, template: 'pickup.booked', dedupeKey: `pickup.booked:${id}`,
+        vars: { name: c.full_name, window: await this.windowText(tx, b.branchId, b.window), address: addressLine(ad), notes: b.notes ?? '', url: `${brand.base}/bookings` } });
       return { id };
     });
   }

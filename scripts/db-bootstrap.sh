@@ -12,6 +12,7 @@ run() {
 
 run postgres -c "DO \$\$ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='eazy_owner') THEN CREATE ROLE eazy_owner LOGIN PASSWORD 'eazy_owner_dev' CREATEDB; END IF;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='eazy_worker') THEN CREATE ROLE eazy_worker LOGIN PASSWORD 'eazy_worker_dev' NOSUPERUSER NOBYPASSRLS NOCREATEDB; END IF;
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='eazy_app') THEN CREATE ROLE eazy_app LOGIN PASSWORD 'eazy_app_dev' NOSUPERUSER NOBYPASSRLS NOCREATEDB; END IF;
 END \$\$;"
 for db in eazylaundry eazylaundry_test; do

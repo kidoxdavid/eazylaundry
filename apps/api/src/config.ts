@@ -11,6 +11,13 @@ export interface AppConfig {
   authThrottleLimit: number;
   maxFailedLogins: number;
   lockMinutes: number;
+  /** Least-privilege role used by the background worker. When unset the worker does not run. */
+  workerDatabaseUrl?: string;
+  workerIntervalMs: number;
+  /** Outbound email. When unset, messages are recorded as 'logged' and NOT delivered. */
+  smtpUrl?: string;
+  mailFrom: string;
+  publicWebUrl: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -35,5 +42,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     authThrottleLimit: Number(env.AUTH_THROTTLE_LIMIT ?? 10),
     maxFailedLogins: Number(env.MAX_FAILED_LOGINS ?? 5),
     lockMinutes: Number(env.LOCK_MINUTES ?? 15),
+    workerDatabaseUrl: env.DATABASE_WORKER_URL || undefined,
+    workerIntervalMs: Number(env.WORKER_INTERVAL_MS ?? (env.NODE_ENV === 'test' ? 0 : 5000)),
+    smtpUrl: env.SMTP_URL || undefined,
+    mailFrom: env.MAIL_FROM ?? 'EazyLaundry <no-reply@localhost>',
+    publicWebUrl: (env.PUBLIC_WEB_URL ?? 'http://localhost:5173').replace(/\/+$/, ''),
   };
 }

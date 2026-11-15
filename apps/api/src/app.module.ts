@@ -30,6 +30,12 @@ import { WorkflowService } from './production/workflow.service.js';
 import { CashController } from './cash/cash.controller.js';
 import { RefundsController } from './cash/refunds.controller.js';
 import { LogisticsController } from './logistics/logistics.controller.js';
+import { CustomerSessionService } from './portal/customer-session.service.js';
+import { PortalController } from './portal/portal.controller.js';
+import { PublicController } from './portal/public.controller.js';
+import { NotificationsController } from './notifications/notifications.controller.js';
+import { NotificationsService } from './notifications/notifications.service.js';
+import { NotificationsWorker } from './notifications/worker.js';
 import { TasksService } from './logistics/tasks.service.js';
 import { ZonesService } from './logistics/zones.service.js';
 import { PricingController } from './pricing/pricing.controller.js';
@@ -45,11 +51,11 @@ export function buildAppModule(cfg: AppConfig) {
       { name: 'default', ttl: 60_000, limit: cfg.throttleLimit },
       { name: 'auth', ttl: 60_000, limit: cfg.authThrottleLimit, skipIf: (ctx) => !Reflect.getMetadata(AUTH_THROTTLE_KEY, ctx.getHandler()) },
     ])],
-    controllers: [HealthController, AuthController, BranchesController, RolesController, MembersController, ConfigController, AuditController, CustomersController, CatalogueController, PricingController, OrdersController, ProductionController, CashController, RefundsController, LogisticsController],
+    controllers: [HealthController, AuthController, BranchesController, RolesController, MembersController, ConfigController, AuditController, CustomersController, CatalogueController, PricingController, OrdersController, ProductionController, CashController, RefundsController, LogisticsController, NotificationsController, PublicController, PortalController],
     providers: [
       { provide: APP_CONFIG, useValue: cfg },
       { provide: FIELD_CIPHER, useValue: new FieldCipher(cfg.encryptionSecret) },
-      AuditService, ConfigService, PricingService, WorkflowService, ZonesService, TasksService, AuthService, PasswordService, SessionService, TenantsService, AuthorizationService,
+      AuditService, ConfigService, PricingService, WorkflowService, ZonesService, TasksService, NotificationsService, NotificationsWorker, CustomerSessionService, AuthService, PasswordService, SessionService, TenantsService, AuthorizationService,
       { provide: APP_GUARD, useClass: ThrottlerGuard },
       { provide: APP_GUARD, useClass: AuthGuard },
       { provide: APP_FILTER, useClass: AllExceptionsFilter },

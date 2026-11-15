@@ -1,5 +1,6 @@
 CREATE ROLE eazy_owner LOGIN PASSWORD 'eazy_owner_dev' CREATEDB;
 CREATE ROLE eazy_app LOGIN PASSWORD 'eazy_app_dev' NOSUPERUSER NOBYPASSRLS NOCREATEDB;
+CREATE ROLE eazy_worker LOGIN PASSWORD 'eazy_worker_dev' NOSUPERUSER NOBYPASSRLS NOCREATEDB;
 CREATE DATABASE eazylaundry OWNER eazy_owner;
 CREATE DATABASE eazylaundry_test OWNER eazy_owner;
 \c eazylaundry

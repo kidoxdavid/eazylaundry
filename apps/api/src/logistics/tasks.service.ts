@@ -35,21 +35,22 @@ export class TasksService {
   seal(otp: string) { return this.cipher.encrypt(otp); }
   reveal(enc: string | null) { return enc ? this.cipher.decrypt(enc) : null; }
 
-  async create(tx: Tx, a: Actor, p: NewTask): Promise<string> {
+  async create(tx: Tx, a: Actor, p: NewTask): Promise<{ id: string; otp: string | null }> {
     const id = uuidv7();
+    const otp = p.kind === 'delivery' ? this.newOtp() : null;
     try {
       await tx.query('SAVEPOINT task');
       await tx.query(
         `INSERT INTO delivery_tasks (id, tenant_id, branch_id, kind, order_id, customer_id, zone_id, window_start, window_end, address, postal_code, contact_name, contact_phone, notes, fee_minor, otp_enc, created_by)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
         [id, a.tenantId, p.branchId, p.kind, p.orderId, p.customerId, p.zoneId, p.window.start, p.window.end, JSON.stringify(p.address), p.postalCode, p.contactName, p.contactPhone, p.notes,
-         p.feeMinor, p.kind === 'delivery' ? this.seal(this.newOtp()) : null, a.userId]);
+         p.feeMinor, otp ? this.seal(otp) : null, a.userId]);
     } catch (e: any) {
       await tx.query('ROLLBACK TO SAVEPOINT task');
       if (e.code === '23505' && /one_live_delivery/.test(e.constraint ?? '')) throw new AppError(409, 'DELIVERY_EXISTS', 'This order already has a delivery scheduled');
       throw e;
     }
     await this.event(tx, a, { id, branch_id: p.branchId }, 'task.created', { kind: p.kind, windowStart: p.window.start, windowEnd: p.window.end, feeMinor: Number(p.feeMinor) });
-    return id;
+    return { id, otp };
   }
 }

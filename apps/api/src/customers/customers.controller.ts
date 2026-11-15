@@ -13,7 +13,7 @@ import { ZodPipe } from '../common/zod.pipe.js';
 import { DATABASE } from '../db/db.module.js';
 
 const email = z.string().trim().toLowerCase().email().max(254);
-const addressSchema = z.object({
+export const addressSchema = z.object({
   label: z.string().trim().min(1).max(40).default('Home'),
   line1: z.string().trim().min(1).max(120), line2: z.string().trim().max(120).optional(),
   city: z.string().trim().min(1).max(80), province: z.enum(PROVINCES), postalCode,

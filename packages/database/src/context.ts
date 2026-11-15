@@ -5,6 +5,12 @@ export interface DbContext {
   userId?: string;
   allBranches?: boolean;
   branchIds?: string[];
+  /** Customer-portal sessions: restricts every customer-scoped table to this customer (see migration 0008). */
+  customerId?: string;
+  /** Public storefront lookup: lets the tenants row with this slug be read before a tenant is known. */
+  publicSlug?: string;
+  /** Hex SHA-256 of a presented session token, so exactly that session row is readable before the tenant is known. */
+  sessionHash?: string;
 }
 
 export type Tx = pg.PoolClient;
@@ -23,8 +29,9 @@ export class Database {
       await client.query('BEGIN');
       await client.query(
         `SELECT set_config('app.tenant_id', $1, true), set_config('app.user_id', $2, true),
-                set_config('app.all_branches', $3, true), set_config('app.branch_ids', $4, true)`,
-        [ctx.tenantId ?? '', ctx.userId ?? '', ctx.allBranches ? 'true' : 'false', (ctx.branchIds ?? []).join(',')]);
+                set_config('app.all_branches', $3, true), set_config('app.branch_ids', $4, true),
+                set_config('app.customer_id', $5, true), set_config('app.public_slug', $6, true), set_config('app.session_hash', $7, true)`,
+        [ctx.tenantId ?? '', ctx.userId ?? '', ctx.allBranches ? 'true' : 'false', (ctx.branchIds ?? []).join(','), ctx.customerId ?? '', ctx.publicSlug ?? '', ctx.sessionHash ?? '']);
       const out = await fn(client);
       await client.query('COMMIT');
       return out;
