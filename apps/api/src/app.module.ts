@@ -24,7 +24,9 @@ import { AuthorizationService } from './iam/authorization.service.js';
 import { MembersController } from './iam/members.controller.js';
 import { RolesController } from './iam/roles.controller.js';
 import { CatalogueController } from './catalogue/catalogue.controller.js';
+import { OrdersController } from './orders/orders.controller.js';
 import { PricingController } from './pricing/pricing.controller.js';
+import { PricingService } from './pricing/pricing.service.js';
 import { CustomersController } from './customers/customers.controller.js';
 import { BranchesController } from './tenancy/branches.controller.js';
 import { TenantsService } from './tenancy/tenants.service.js';
@@ -36,11 +38,11 @@ export function buildAppModule(cfg: AppConfig) {
       { name: 'default', ttl: 60_000, limit: cfg.throttleLimit },
       { name: 'auth', ttl: 60_000, limit: cfg.authThrottleLimit, skipIf: (ctx) => !Reflect.getMetadata(AUTH_THROTTLE_KEY, ctx.getHandler()) },
     ])],
-    controllers: [HealthController, AuthController, BranchesController, RolesController, MembersController, ConfigController, AuditController, CustomersController, CatalogueController, PricingController],
+    controllers: [HealthController, AuthController, BranchesController, RolesController, MembersController, ConfigController, AuditController, CustomersController, CatalogueController, PricingController, OrdersController],
     providers: [
       { provide: APP_CONFIG, useValue: cfg },
       { provide: FIELD_CIPHER, useValue: new FieldCipher(cfg.encryptionSecret) },
-      AuditService, ConfigService, AuthService, PasswordService, SessionService, TenantsService, AuthorizationService,
+      AuditService, ConfigService, PricingService, AuthService, PasswordService, SessionService, TenantsService, AuthorizationService,
       { provide: APP_GUARD, useClass: ThrottlerGuard },
       { provide: APP_GUARD, useClass: AuthGuard },
       { provide: APP_FILTER, useClass: AllExceptionsFilter },

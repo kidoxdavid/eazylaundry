@@ -15,4 +15,11 @@
 html, body, #root { height: 100%; }
 body { font-size: 14px; color: var(--color-ink); background: var(--color-surface); font-variant-numeric: tabular-nums; }
 :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+/* Receipt: 80mm thermal-style print layout. Only the receipt is printed. */
+@media print {
+  body * { visibility: hidden; }
+  .receipt, .receipt * { visibility: visible; }
+  .receipt { position: absolute; left: 0; top: 0; width: 80mm; padding: 4mm; font-size: 11px; color: #000; background: #fff; }
+  @page { margin: 0; }
+}
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

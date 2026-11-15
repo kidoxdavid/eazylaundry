@@ -18,8 +18,9 @@ Decisions D1–D5 approved ("go with your recommendations"): dogfood-first launc
 | `@eazy/api` customers (CRUD, search, duplicates, addresses, consent history, permissions, cross-tenant) | 11 | pass |
 | `@eazy/api` pricing engine (pure unit + property tests) | 9 | pass |
 | `@eazy/api` catalogue, price history, branch overrides, tax rates, discounts/limits, cross-tenant | 11 | pass |
+| `@eazy/api` orders & payments (idempotency incl. concurrent duplicates, gap-free numbering, multi-payment, cash change, cancel, receipts, branch RLS, cross-tenant) | 16 | pass |
 | `@eazy/money` rounding, allocation, tax (known cases + property tests vs independent oracle) | 16 | pass |
-Total **93/93**. The isolation suite was mutation-checked: disabling RLS on `branches` makes 7 tests fail.
+Total **112/112**. The isolation suite was mutation-checked: disabling RLS on `branches` makes 7 tests fail.
 UI verified by a scripted Playwright run against the real API (register → add branch with server-side validation → add member → audit → sign out). No automated frontend tests yet.
 
 ## Completed (Phase 1)
@@ -35,7 +36,9 @@ UI verified by a scripted Playwright run against the real API (register → add 
 - `@eazy/money`: bigint minor-unit money, exact decimal rates, rounding modes (half-up/half-even/up/down), largest-remainder allocation, configurable tax engine (multi-component, compound, inclusive/exclusive, line/order rounding). Inclusive pricing preserves the entered total exactly. Not yet wired into any API.
 - **Customers (done):** tenant-scoped customers with E.164 phone normalisation, duplicate prevention by phone/email among live records (archive frees them), guests, Canadian addresses (postal/province validated in DB and API, one default per customer), append-only consent history (CASL-oriented), optimistic concurrency, trigram search, audit trail. UI: list/search, create, detail with edit, addresses, consent switches. Verified in a real browser.
 - **Services, price lists & pricing engine (done):** categories, services (per kg / per item / fixed, tax category, express, turnaround), append-only price versions (history never rewritten; branch override beats the general price), default Standard price list and Alberta GST 5% seeded per tenant as editable data, effective-dated multi-component tax rates, config-driven tax mode (inclusive/exclusive) and rounding level. `POST /pricing/quote` is the single server-side pricing path (min charge, express, discount allocation, tax; discounts gated by `discount.apply` and its amount limit). UI: services & prices, change price, live price calculator, settings for tax mode/rounding. Verified in a real browser.
-- Next: orders & POS (order + order lines snapshotting the quote, order numbers, intake, payments).
+- **Orders, POS & payments (done, first slice):** `POST /orders` re-prices on the server via the same `PricingService` as `/pricing/quote`, writes an order with immutable price-snapshot lines and an append-only event history, allocates a gap-free per-branch/month order number (`MAIN-2611-00001`) under row lock, and optionally takes an initial payment atomically. Mandatory `Idempotency-Key` (same key + same payload replays; different payload rejected; concurrent duplicates serialise). Payments are separate from allocations (multi-payment, cash tendered/change, overpayment blocked under a row lock, duplicate submissions can't double-charge). Cancel only open unpaid orders. Receipt data endpoint (GST breakdown, branch-time-zone dates). Orders/payments/events/lines are append-only or immutable in the database; branch-limited staff are isolated by a restrictive RLS policy (mutation-tested). Express now applies only to lines whose service offers it.
+- **Mobile-first UI (done):** responsive shell (top bar + slide-over menu on phones, sidebar on desktop), 44px touch targets and 16px inputs, bottom-sheet dialogs, POS (customer search / new / walk-in guest → tap services → weight or quantity → server quote → cash/card/e-transfer/other with change calculator → order number + receipt), orders list (cards on phones, table on desktop), order detail (payments, cancel, timeline), printable 80mm receipt. Verified on a 390×844 touch viewport and desktop with a real browser; no horizontal overflow on any of the 10 pages.
+- Next: production workflow engine (stages, scan, assignments, QC/rework), labels/barcodes, cash shifts, refunds.
 - (superseded) services & price lists → server-side pricing engine (using this package) → orders/POS.
 
 ## Not done yet (Phase 1 gaps — honest list)
@@ -47,6 +50,11 @@ UI verified by a scripted Playwright run against the real API (register → add 
 - Seed/demo-tenant tooling, generated ERD.
 
 ## Known limitations / technical debt
+- Orders cannot be edited after creation (cancel and re-create); order amendments/supplements and refunds are not built, so paid orders cannot be cancelled yet. No ledger postings yet (finance phase) — payments are recorded and reconciled to orders, but the double-entry ledger does not exist.
+- Cash drawer shifts/reconciliation are not built, so cash payments are not tied to a shift yet.
+- Promised time = longest service turnaround (express capped at 24h); business hours/holidays are not considered yet.
+- Receipt printing is browser print (80mm CSS); no thermal printer agent, email/SMS receipts, or tenant-editable receipt template yet.
+- Offline order entry is not supported yet (requires the PWA queue designed in the discovery pack); the app is responsive and touch-friendly but not yet installable/offline.
 - Price lists of kind contract/customer exist in the schema but have no API/UI yet (Phase 3 commercial accounts). Bundles/packages and rule-based pricing (time/volume) are not built.
 - Catalogue reads reuse `order.read` and quotes use `order.create` (no separate `catalogue.read`). Adding a NEW permission later needs a per-tenant backfill of role copies; migrations run as the owner role and cannot see tenant rows under FORCE RLS, so plan a controlled maintenance path before the first permission addition.
 - Money crosses the API as integer minor units (JSON numbers, asserted safe) — documented convention.

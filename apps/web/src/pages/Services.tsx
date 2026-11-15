@@ -3,11 +3,9 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { get, patch, post, put } from '../api';
 import { useAuth } from '../auth';
+import { fmt, toMinor } from '../format';
 import { Badge, Button, Dialog, ErrorBanner, Field, Input, PageHeader, Select, Table } from '../components/ui';
 
-/** Display only. All money arithmetic happens on the server (integer minor units). */
-export const fmt = (minor: number) => `${minor < 0 ? '-' : ''}$${(Math.abs(minor) / 100).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const toMinor = (dollars: string) => Math.round(Number(dollars) * 100);
 const MODEL: Record<string, string> = { per_kg: 'per kg', per_item: 'per item', fixed: 'fixed' };
 const priceText = (s: any) => (s.price ? `${fmt(s.price.unitPriceMinor)} ${MODEL[s.pricingModel]}` : '—');
 

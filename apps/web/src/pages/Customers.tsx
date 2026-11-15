@@ -36,7 +36,7 @@ export function Customers() {
   );
 }
 
-function NewCustomer({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
+export function NewCustomer({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
   const qc = useQueryClient();
   const f = useForm<{ fullName: string; phone: string; email: string; guest: boolean }>();
   const m = useMutation({

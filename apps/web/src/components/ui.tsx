@@ -7,15 +7,15 @@ const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(' ')
 export function Button({ variant = 'primary', loading, className, children, ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost'; loading?: boolean }) {
   const styles = { primary: 'bg-accent text-white hover:bg-accent-strong', secondary: 'bg-white border border-line hover:bg-surface',
     danger: 'bg-danger text-white hover:opacity-90', ghost: 'hover:bg-surface' }[variant];
-  return <button {...p} disabled={p.disabled || loading} className={cx('inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium disabled:opacity-50', styles, className)}>
+  return <button {...p} disabled={p.disabled || loading} className={cx('inline-flex h-11 items-center justify-center gap-2 rounded-md px-4 text-base font-medium disabled:opacity-50 md:h-9 md:px-3 md:text-sm', styles, className)}>
     {loading ? 'Working…' : children}</button>;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...p }, ref) {
-  return <input ref={ref} {...p} className={cx('h-9 w-full rounded-md border border-line bg-white px-3 text-sm', className)} />;
+  return <input ref={ref} {...p} className={cx('h-11 w-full rounded-md border border-line bg-white px-3 text-base md:h-9 md:text-sm', className)} />;
 });
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, ...p }, ref) {
-  return <select ref={ref} {...p} className={cx('h-9 w-full rounded-md border border-line bg-white px-2 text-sm', className)} />;
+  return <select ref={ref} {...p} className={cx('h-11 w-full rounded-md border border-line bg-white px-2 text-base md:h-9 md:text-sm', className)} />;
 });
 
 export function Field({ label, error, hint, children }: { label: string; error?: string; hint?: string; children: (id: string, describedBy?: string) => ReactNode }) {
@@ -41,7 +41,7 @@ export function ErrorBanner({ error }: { error: unknown }) {
 
 export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
   return (
-    <div className="mb-5 flex items-end justify-between gap-4">
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div><h1 className="text-xl font-semibold">{title}</h1>{subtitle && <p className="text-muted">{subtitle}</p>}</div>{action}
     </div>
   );
@@ -74,8 +74,8 @@ export function Dialog({ title, onClose, children }: { title: string; onClose: (
     return () => { document.removeEventListener('keydown', esc); prev?.focus(); };
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-20 flex items-start justify-center bg-black/30 p-4 pt-24" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={ref} role="dialog" aria-modal="true" aria-label={title} className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+    <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-start sm:p-4 sm:pt-24" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div ref={ref} role="dialog" aria-modal="true" aria-label={title} className="max-h-[92dvh] w-full overflow-y-auto rounded-t-xl bg-white p-4 pb-6 shadow-xl sm:max-w-md sm:rounded-lg sm:p-5">
         <h2 className="mb-4 text-base font-semibold">{title}</h2>{children}
       </div>
     </div>

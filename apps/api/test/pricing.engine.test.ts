@@ -35,6 +35,12 @@ describe('pricing engine', () => {
     expect(fixed.lines[0].expressMinor).toBe(700n);
     expect(() => priceQuote({ lines: [{ serviceId: 's1', weightG: 2000 }], express: true, taxPolicy: GST }, map(svc({ expressCapable: false })))).toThrowError(/express/i);
   });
+  it('express applies only to lines that offer it; the rest are priced normally', () => {
+    const shirt = svc({ id: 'sh', pricingModel: 'per_item', expressCapable: false, price: { unitPriceMinor: 399n, expressType: 'none', expressPercent: null } });
+    const q = priceQuote({ lines: [{ serviceId: 's1', weightG: 2000 }, { serviceId: 'sh', quantity: 2 }], express: true, taxPolicy: GST }, map(svc(), shirt));
+    expect(q.lines[0].expressMinor).toBe(250n); expect(q.lines[1].expressMinor).toBe(0n);
+    expect(q.lines[1].baseMinor).toBe(798n);
+  });
   it('spreads a discount across lines exactly and taxes the discounted amounts', () => {
     const a = svc({ id: 'a', pricingModel: 'fixed', price: { unitPriceMinor: 1000n } });
     const b = svc({ id: 'b', pricingModel: 'fixed', price: { unitPriceMinor: 2000n } });
