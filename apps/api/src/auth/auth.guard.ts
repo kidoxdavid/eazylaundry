@@ -39,6 +39,10 @@ export class AuthGuard implements CanActivate {
     if (actor.mustChangePassword) throw forbidden('PASSWORD_CHANGE_REQUIRED', 'You must change your temporary password first');
 
     if (!actor.tenantId) throw forbidden('NO_ACTIVE_TENANT', 'No active business membership');
+    if (access.kind === 'any') {
+      if (!access.codes.some((c) => actor.permissions.has(c))) throw forbidden('PERMISSION_DENIED', `Missing permission: one of ${access.codes.join(', ')}`);
+      return true;
+    }
     for (const code of access.codes) {
       if (!actor.permissions.has(code)) throw forbidden('PERMISSION_DENIED', `Missing permission: ${code}`);
     }

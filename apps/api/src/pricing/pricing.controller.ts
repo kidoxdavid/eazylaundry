@@ -11,6 +11,7 @@ import { PricingService } from './pricing.service.js';
 
 export const quoteSchema = z.object({
   branchId: z.string().uuid(),
+  deliveryAddressId: z.string().uuid().optional(),
   express: z.boolean().default(false),
   lines: z.array(z.object({ serviceId: z.string().uuid(), quantity: z.number().int().min(1).max(10_000).optional(), weightG: z.number().int().min(1).max(1_000_000).optional() })).min(1).max(100),
   discount: z.discriminatedUnion('type', [
@@ -37,7 +38,7 @@ export class PricingController {
   quote(@CurrentActor() a: Actor, @Body(new ZodPipe(quoteSchema)) b: z.infer<typeof quoteSchema>) {
     return this.db.withContext(dbCtx(a), async (tx) => {
       const r = await this.pricing.quote(tx, a, b);
-      return { currency: r.currency, ...jsonMoney(r.quote), taxPolicy: { priceMode: r.taxPolicy.priceMode, roundingLevel: r.taxPolicy.roundingLevel, components: r.taxPolicy.components } };
+      return { currency: r.currency, ...jsonMoney(r.quote), delivery: r.delivery ? jsonMoney({ zone: r.delivery.zoneName, feeMinor: r.delivery.feeMinor, freeDelivery: r.delivery.freeDelivery }) : null, taxPolicy: { priceMode: r.taxPolicy.priceMode, roundingLevel: r.taxPolicy.roundingLevel, components: r.taxPolicy.components } };
     });
   }
 }

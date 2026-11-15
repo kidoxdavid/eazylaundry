@@ -12,6 +12,7 @@ import type { Actor } from '../common/types.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { DATABASE } from '../db/db.module.js';
 import { ConfigService } from '../config/config.service.js';
+import { TasksService, windowSchema } from '../logistics/tasks.service.js';
 import { quoteSchema } from '../pricing/pricing.controller.js';
 import { WorkflowService, newScanToken } from '../production/workflow.service.js';
 import { PricingService } from '../pricing/pricing.service.js';
@@ -26,7 +27,9 @@ const createSchema = quoteSchema.extend({
   customerId: z.string().uuid(),
   instructions: z.string().trim().max(1000).optional(),
   payment: paymentSchema.optional(),
-});
+  /** Required when deliveryAddressId is set: when the customer wants it delivered. */
+  deliveryWindow: windowSchema.optional(),
+}).refine((v) => !!v.deliveryAddressId === !!v.deliveryWindow, { path: ['deliveryWindow'], message: 'Choose a delivery address and a delivery window together' });
 const listQuery = z.object({
   status: z.enum(['open', 'ready', 'completed', 'cancelled']).optional(), branchId: z.string().uuid().optional(), customerId: z.string().uuid().optional(),
   q: z.string().trim().max(60).optional(), unpaid: z.enum(['true', 'false']).optional(),
@@ -39,7 +42,7 @@ const N = (v: unknown) => Number(v);
 const paymentStatus = (r: any) => (N(r.paid_minor) === 0 ? 'unpaid' : N(r.paid_minor) >= N(r.total_minor) ? 'paid' : 'partial');
 export const mapOrder = (r: any) => ({
   stageKey: r.stage_key ?? null, stageName: r.stage_name ?? null, reworkCount: r.rework_count ?? 0, stageEnteredAt: r.stage_entered_at ?? null,
-  id: r.id, orderNo: r.order_no, branchId: r.branch_id, customerId: r.customer_id, customerName: r.customer_name, status: r.status, express: r.express,
+  deliveryFeeMinor: N(r.delivery_fee_minor ?? 0), id: r.id, orderNo: r.order_no, branchId: r.branch_id, customerId: r.customer_id, customerName: r.customer_name, status: r.status, express: r.express,
   currency: r.currency, priceMode: r.price_mode, subtotalMinor: N(r.subtotal_minor), discountMinor: N(r.discount_minor), netMinor: N(r.net_minor),
   taxMinor: N(r.tax_minor), totalMinor: N(r.total_minor), paidMinor: N(r.paid_minor), balanceMinor: N(r.total_minor) - N(r.paid_minor), paymentStatus: paymentStatus(r),
   instructions: r.instructions, promisedAt: r.promised_at, cancelledReason: r.cancelled_reason, version: r.version, createdAt: r.created_at,
@@ -66,7 +69,8 @@ export async function loadOrder(tx: Tx, id: string) {
 export class OrdersController {
   constructor(@Inject(DATABASE) private readonly db: Database, @Inject(AuditService) private readonly audit: AuditService,
               @Inject(PricingService) private readonly pricing: PricingService, @Inject(WorkflowService) private readonly workflow: WorkflowService,
-              @Inject(ConfigService) private readonly cfg: ConfigService) {}
+              @Inject(ConfigService) private readonly cfg: ConfigService,
+              @Inject(TasksService) private readonly tasks: TasksService) {}
 
   private async event(tx: Tx, a: Actor, order: { id: string; branch_id: string }, type: string, payload: Record<string, unknown> = {}, note?: string) {
     await tx.query(`INSERT INTO order_events (id, tenant_id, branch_id, order_id, type, actor_user_id, note, payload) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
@@ -141,10 +145,12 @@ export class OrdersController {
             await tx.query('SAVEPOINT ord');
             await tx.query(
               `INSERT INTO orders (id, tenant_id, branch_id, order_no, customer_id, express, currency, price_mode, subtotal_minor, discount_minor, net_minor, tax_minor, total_minor,
-                                   instructions, promised_at, created_by, workflow_definition_id, current_stage_id, scan_token)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now() + make_interval(hours => $15), $16, $17, $18, $19)`,
+                                   instructions, promised_at, created_by, workflow_definition_id, current_stage_id, scan_token,
+                                   delivery_fee_minor, delivery_fee_tax_minor, delivery_fee_tax_breakdown)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now() + make_interval(hours => $15), $16, $17, $18, $19, $20, $21, $22)`,
               [id, a.tenantId, b.branchId, orderNo, b.customerId, q.express, ctx.currency, q.priceMode, q.subtotalMinor, q.discountMinor, q.netMinor, q.taxMinor, q.totalMinor,
-               b.instructions ?? null, hours, a.userId, wf.definitionId, wf.stages[0].id, newScanToken()]);
+               b.instructions ?? null, hours, a.userId, wf.definitionId, wf.stages[0].id, newScanToken(),
+               q.fee?.amountMinor ?? 0n, q.fee?.taxMinor ?? 0n, JSON.stringify(Object.fromEntries(Object.entries(q.fee?.taxByComponent ?? {}).map(([k, v]) => [k, Number(v)])))]);
             break;
           } catch (e: any) {
             await tx.query('ROLLBACK TO SAVEPOINT ord');
@@ -162,10 +168,17 @@ export class OrdersController {
              l.expressMinor, l.discountMinor, l.netMinor, l.taxMinor, l.totalMinor, JSON.stringify(Object.fromEntries(Object.entries(l.taxByComponent).map(([k, v]) => [k, Number(v)]))),
              ctx.services.get(l.serviceId)!.turnaroundHours]);
         }
+        let deliveryTaskId: string | null = null;
+        if (ctx.delivery) {
+          const cust = (await tx.query(`SELECT full_name, phone, (SELECT 1 FROM customer_addresses WHERE id = $2 AND customer_id = $1) AS owns FROM customers WHERE id = $1`, [b.customerId, b.deliveryAddressId])).rows[0];
+          if (!cust.owns) throw new AppError(422, 'ADDRESS_NOT_CUSTOMERS', 'That address does not belong to this customer');
+          deliveryTaskId = await this.tasks.create(tx, a, { branchId: b.branchId, kind: 'delivery', orderId: id, customerId: b.customerId, zoneId: ctx.delivery.zoneId,
+            window: b.deliveryWindow!, address: ctx.delivery.address, postalCode: ctx.delivery.postalCode, contactName: cust.full_name, contactPhone: cust.phone, notes: null, feeMinor: ctx.delivery.feeMinor });
+        }
         await this.event(tx, a, { id, branch_id: b.branchId }, 'order.created', { orderNo, totalMinor: Number(q.totalMinor), lines: q.lines.length });
         await this.audit.record(tx, a, { action: 'order.created', entityType: 'order', entityId: id, branchId: b.branchId, detail: { orderNo, totalMinor: Number(q.totalMinor) } });
         const pay = b.payment ? await this.applyPayment(tx, a, id, b.payment) : null;
-        return { id, orderNo, totalMinor: Number(q.totalMinor), paidMinor: pay ? b.payment!.amountMinor : 0, changeMinor: pay?.changeMinor ?? 0 };
+        return { id, orderNo, totalMinor: Number(q.totalMinor), paidMinor: pay ? b.payment!.amountMinor : 0, changeMinor: pay?.changeMinor ?? 0, deliveryTaskId };
       });
       return { ...response, replayed };
     });
@@ -203,9 +216,12 @@ export class OrdersController {
       const lines = await tx.query(`SELECT * FROM order_lines WHERE order_id = $1 ORDER BY line_no`, [id]);
       const pays = await tx.query(`SELECT p.* FROM payments p JOIN payment_allocations pa ON pa.tenant_id = p.tenant_id AND pa.payment_id = p.id WHERE pa.order_id = $1 ORDER BY p.received_at`, [id]);
       const events = await tx.query(`SELECT id, type, actor_user_id, note, payload, occurred_at FROM order_events WHERE order_id = $1 ORDER BY occurred_at, id`, [id]);
+      const dt = (await tx.query(`SELECT t.id, t.status, t.window_start, t.window_end, t.fee_minor, t.attempts, u.full_name AS driver_name FROM delivery_tasks t LEFT JOIN users u ON u.id = t.assigned_to
+                                   WHERE t.order_id = $1 AND t.kind = 'delivery' ORDER BY t.created_at DESC LIMIT 1`, [id])).rows[0];
       const refunds = (await tx.query(`SELECT id, payment_id, method, amount_minor, reference, refunded_at FROM refunds WHERE order_id = $1 ORDER BY refunded_at`, [id])).rows;
       const refundedFor = (pid: string) => refunds.filter((r) => r.payment_id === pid).reduce((n, r) => n + N(r.amount_minor), 0);
       return { ...mapOrder(o), lines: lines.rows.map(mapLine),
+        delivery: dt ? { id: dt.id, status: dt.status, windowStart: dt.window_start, windowEnd: dt.window_end, feeMinor: N(dt.fee_minor), attempts: dt.attempts, driverName: dt.driver_name } : null,
         payments: pays.rows.map((p) => ({ ...mapPayment(p), refundedMinor: refundedFor(p.id), refundableMinor: N(p.amount_minor) - refundedFor(p.id) })),
         refunds: refunds.map((r) => ({ id: r.id, paymentId: r.payment_id, method: r.method, amountMinor: N(r.amount_minor), reference: r.reference, refundedAt: r.refunded_at })),
         events: events.rows.map((e) => ({ id: e.id, type: e.type, actorUserId: e.actor_user_id, note: e.note, payload: e.payload, occurredAt: e.occurred_at })) };
@@ -251,9 +267,10 @@ export class OrdersController {
                                     FROM branches b JOIN organizations org ON org.tenant_id = b.tenant_id WHERE b.id = $1`, [o.branch_id, o.created_at, o.promised_at])).rows[0];
       const taxByComponent: Record<string, number> = {};
       for (const l of lines) for (const [k, v] of Object.entries(l.taxBreakdown)) taxByComponent[k] = (taxByComponent[k] ?? 0) + (v as number);
+      for (const [k, v] of Object.entries(o.delivery_fee_tax_breakdown ?? {})) taxByComponent[k] = (taxByComponent[k] ?? 0) + Number(v);
       const m = mapOrder(o);
       return { business: br.legal_name, branch: br.name, address: br.address, orderNo: m.orderNo, dateLocal: br.local_time, timezone: br.timezone, customerName: m.customerName,
-        express: m.express, currency: m.currency, priceMode: m.priceMode, lines, subtotalMinor: m.subtotalMinor, discountMinor: m.discountMinor, taxByComponent, taxMinor: m.taxMinor,
+        express: m.express, currency: m.currency, priceMode: m.priceMode, lines, subtotalMinor: m.subtotalMinor, deliveryFeeMinor: m.deliveryFeeMinor, discountMinor: m.discountMinor, taxByComponent, taxMinor: m.taxMinor,
         totalMinor: m.totalMinor, payments: pays, paidMinor: m.paidMinor, balanceMinor: m.balanceMinor, promisedAt: m.promisedAt, promisedLocal: br.promised_local, instructions: m.instructions, status: m.status };
     });
   }

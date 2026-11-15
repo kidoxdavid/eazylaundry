@@ -28,6 +28,10 @@ export function POS() {
   const [tendered, setTendered] = useState('');
   const [done, setDone] = useState<any>(null);
   const [receipt, setReceipt] = useState(false);
+  const [deliver, setDeliver] = useState(false); const [addressId, setAddressId] = useState(''); const [winStart, setWinStart] = useState(''); const [winHours, setWinHours] = useState('2');
+  const custFull = useQuery({ queryKey: ['customer', customer?.id], enabled: !!customer && deliver, queryFn: () => get(`/customers/${customer!.id}`) });
+  const addresses: any[] = custFull.data?.addresses ?? [];
+  useEffect(() => { if (deliver && addresses.length && !addresses.some((a) => a.id === addressId)) setAddressId((addresses.find((a) => a.isDefault) ?? addresses[0]).id); }, [deliver, addresses, addressId]);
   const keyRef = useRef(newKey());
   const till = useTill(branchId); const [openTill, setOpenTill] = useState(false);
 
@@ -42,7 +46,8 @@ export function POS() {
   }), [lines, services.data]);
   const valid = lines.length > 0 && lines.every((l) => Number(l.amount) > 0);
   const discountBody = discount && Number(discount) > 0 ? { type: 'percent', percent: discount } : undefined;
-  const reqBody = useDebounced({ branchId, express, lines: apiLines, discount: discountBody });
+  const deliveryId = deliver && addressId ? addressId : undefined;
+  const reqBody = useDebounced({ branchId, express, lines: apiLines, discount: discountBody, deliveryAddressId: deliveryId });
   const quote = useQuery({ queryKey: ['quote', reqBody], enabled: !!branchId && valid, retry: false, placeholderData: (p) => p,
     queryFn: () => post('/pricing/quote', reqBody) });
   const q = valid ? quote.data : undefined;
@@ -57,10 +62,11 @@ export function POS() {
 
   const submit = useMutation({
     mutationFn: () => post('/orders', { branchId, customerId: customer!.id, express, lines: apiLines, discount: discountBody, instructions: instructions || undefined,
+      ...(deliveryId ? { deliveryAddressId: deliveryId, deliveryWindow: { start: new Date(winStart).toISOString(), end: new Date(new Date(winStart).getTime() + Number(winHours) * 3600_000).toISOString() } } : {}),
       ...(payNow && amountMinor > 0 ? { payment: { method, amountMinor, ...(method === 'cash' && tendered ? { tenderedMinor } : {}) } } : {}) }, keyRef.current),
     onSuccess: (r) => { setDone(r); qc.invalidateQueries({ queryKey: ['orders'] }); },
   });
-  const reset = () => { setCustomer(null); setLines([]); setExpress(false); setDiscount(''); setInstructions(''); setPayNow(true); setMethod('cash'); setAmount(''); setTendered(''); setDone(null);
+  const reset = () => { setCustomer(null); setLines([]); setExpress(false); setDiscount(''); setInstructions(''); setPayNow(true); setMethod('cash'); setAmount(''); setTendered(''); setDone(null); setDeliver(false); setAddressId(''); setWinStart('');
     submit.reset(); keyRef.current = newKey(); };
 
   if (!can('order.create')) return <p role="alert">You do not have permission to create orders.</p>;
@@ -134,6 +140,21 @@ export function POS() {
               {can('discount.apply') && lines.length > 0 && (
                 <label className="flex items-center gap-2 text-sm">Discount %<Input aria-label="Discount percent" className="w-20" inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value.replace(/[^0-9.]/g, ''))} /></label>)}
             </div>
+            {customer && customer.fullName !== 'Walk-in guest' && (
+              <div className="space-y-2 rounded-lg bg-surface p-3">
+                <label className="flex min-h-[44px] items-center gap-2 font-medium"><input type="checkbox" className="h-5 w-5" checked={deliver} onChange={(e) => setDeliver(e.target.checked)} /> Deliver to the customer</label>
+                {deliver && !custFull.isLoading && !addresses.length && <p className="text-sm text-warning">This customer has no saved address. <Link className="underline" to={`/customers/${customer.id}`}>Add one</Link>.</p>}
+                {deliver && addresses.length > 0 && (
+                  <>
+                    <Field label="Delivery address">{(id) => <Select id={id} value={addressId} onChange={(e) => setAddressId(e.target.value)}>{addresses.map((a: any) => <option key={a.id} value={a.id}>{a.label}: {a.line1}, {a.city} {a.postalCode}</option>)}</Select>}</Field>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Field label="Deliver from">{(id) => <Input id={id} type="datetime-local" value={winStart} onChange={(e) => setWinStart(e.target.value)} />}</Field>
+                      <Field label="Window">{(id) => <Select id={id} value={winHours} onChange={(e) => setWinHours(e.target.value)}><option value="1">1 hour</option><option value="2">2 hours</option><option value="3">3 hours</option><option value="4">4 hours</option></Select>}</Field>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             <Field label="Order notes (stains, preferences)">{(id) => <Input id={id} value={instructions} maxLength={1000} onChange={(e) => setInstructions(e.target.value)} />}</Field>
           </Section>
         </div>
@@ -147,6 +168,7 @@ export function POS() {
                 <dl className="grid grid-cols-2 gap-y-1">
                   <dt>Subtotal</dt><dd className="text-right">{fmt(q.subtotalMinor)}</dd>
                   {q.discountMinor > 0 && <><dt>Discount</dt><dd className="text-right">-{fmt(q.discountMinor)}</dd></>}
+                  {q.fee && <><dt>Delivery{q.delivery?.freeDelivery ? ' (free)' : ''}</dt><dd className="text-right">{fmt(q.fee.amountMinor)}</dd></>}
                   {Object.entries(q.taxByComponent).map(([k, v]) => <><dt key={`${k}-l`}>{k}{q.priceMode === 'inclusive' ? ' (included)' : ''}</dt><dd key={`${k}-v`} className="text-right">{fmt(v as number)}</dd></>)}
                   <dt className="text-lg font-bold">Total</dt><dd className="text-right text-lg font-bold">{fmt(q.totalMinor)}</dd>
                 </dl>
@@ -186,7 +208,7 @@ export function POS() {
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white p-3 lg:static lg:mt-4 lg:border-0 lg:bg-transparent lg:p-0">
         <div className="mx-auto flex max-w-5xl items-center gap-3">
           <div className="min-w-[90px] lg:hidden"><div className="text-xs text-muted">Total</div><div className="text-xl font-bold">{q ? fmt(q.totalMinor) : '—'}</div></div>
-          <Button className="flex-1 lg:flex-none lg:px-8" loading={submit.isPending} disabled={!customer || !valid || !q || quote.isError || payInvalid || needTill || (quote.isFetching && !q)} onClick={() => submit.mutate()}>
+          <Button className="flex-1 lg:flex-none lg:px-8" loading={submit.isPending} disabled={!customer || !valid || !q || quote.isError || payInvalid || needTill || (deliver && (!addressId || !winStart)) || (quote.isFetching && !q)} onClick={() => submit.mutate()}>
             {!customer ? 'Choose a customer' : payNow ? `Charge ${amountMinor > 0 ? fmt(amountMinor) : ''}`.trim() : 'Create order (unpaid)'}
           </Button>
         </div>

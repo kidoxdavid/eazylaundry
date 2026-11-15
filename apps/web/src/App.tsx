@@ -7,12 +7,15 @@ import { Branches } from './pages/Branches';
 import { CustomerDetail, Customers } from './pages/Customers';
 import { ChangePassword, Login, Register } from './pages/Auth';
 import { OrderDetail, Orders } from './pages/Orders';
+import { Dispatch } from './pages/Dispatch';
+import { Driver } from './pages/Driver';
 import { Overview } from './pages/Overview';
 import { POS } from './pages/POS';
 import { Production } from './pages/Production';
 import { Refunds } from './pages/Refunds';
 import { Scan } from './pages/Scan';
 import { Till } from './pages/Till';
+import { Zones } from './pages/Zones';
 import { Roles } from './pages/Roles';
 import { Services } from './pages/Services';
 import { Settings } from './pages/Settings';
@@ -48,6 +51,8 @@ function Shell() {
     { to: '/', label: 'Overview', show: true, end: true },
     { to: '/pos', label: 'New order', show: can('order.create') },
     { to: '/orders', label: 'Orders', show: can('order.read') },
+    { to: '/dispatch', label: 'Dispatch', show: can('delivery.dispatch') },
+    { to: '/driver', label: 'My deliveries', show: can('delivery.execute') },
     { to: '/scan', label: 'Scan', show: can('order.read') },
     { to: '/production', label: 'Production', show: can('order.read') },
     { to: '/till', label: 'Till', show: can('cash.shift.manage') },
@@ -57,6 +62,7 @@ function Shell() {
     { to: '/branches', label: 'Branches', show: can('branch.read') },
     { to: '/team', label: 'Team', show: can('member.read') },
     { to: '/roles', label: 'Roles', show: can('role.read') },
+    { to: '/zones', label: 'Delivery zones', show: can('tenant.settings.manage') },
     { to: '/settings', label: 'Settings', show: can('config.read') },
     { to: '/audit', label: 'Audit log', show: can('audit.read') },
   ].filter((i) => i.show);
@@ -113,6 +119,9 @@ export function App() {
         <Route index element={<Overview />} />
         <Route path="pos" element={<POS />} />
         <Route path="till" element={<Till />} />
+        <Route path="dispatch" element={<Dispatch />} />
+        <Route path="driver" element={<Driver />} />
+        <Route path="zones" element={<Zones />} />
         <Route path="refunds" element={<Refunds />} />
         <Route path="scan" element={<Scan />} />
         <Route path="production" element={<Production />} />

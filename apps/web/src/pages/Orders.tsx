@@ -78,6 +78,12 @@ export function OrderDetail() {
         {overdue(o) && <Badge tone="danger">overdue</Badge>}</div>
       {o.status === 'cancelled' && <p className="mb-4 rounded-md bg-red-50 p-3 text-danger">Cancelled: {o.cancelledReason}</p>}
 
+      {o.delivery && (
+        <section className="mb-4 rounded-lg border border-line bg-white p-4" aria-label="Delivery"><div className="mb-1 flex items-center justify-between"><h2 className="font-semibold">Delivery</h2><Badge tone={o.delivery.status === 'completed' ? 'success' : o.delivery.status === 'failed' ? 'danger' : 'neutral'}>{o.delivery.status.replace('_', ' ')}</Badge></div>
+          <p className="text-sm">{dateTime(o.delivery.windowStart)} – {new Date(o.delivery.windowEnd).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}</p>
+          <p className="text-sm text-muted">{o.delivery.driverName ? `Driver: ${o.delivery.driverName}` : 'No driver assigned yet'}{o.delivery.feeMinor ? ` · fee ${fmt(o.delivery.feeMinor)}` : ''}{o.delivery.attempts ? ` · ${o.delivery.attempts} failed attempt(s)` : ''}</p></section>
+      )}
+
       {prod.data && (
         <section className="mb-4 space-y-3 rounded-lg border border-line bg-white p-4" aria-labelledby="prod-h">
           <div className="flex flex-wrap items-center justify-between gap-2"><h2 id="prod-h" className="font-semibold">Production</h2><OrderBadges o={prod.data} /></div>

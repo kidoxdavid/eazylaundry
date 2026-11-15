@@ -13,7 +13,9 @@ export interface PricedService {
 }
 export interface QuoteLineInput { serviceId: string; quantity?: number; weightG?: number }
 export type DiscountInput = { type: 'percent'; percent: string } | { type: 'fixed'; amountMinor: bigint };
-export interface QuoteInput { lines: QuoteLineInput[]; express: boolean; discount?: DiscountInput; taxPolicy: TaxPolicy }
+/** A delivery fee: charged once per order, taxed per its flag, and never discounted. */
+export interface FeeInput { name: string; amountMinor: bigint; taxable: boolean }
+export interface QuoteInput { lines: QuoteLineInput[]; express: boolean; discount?: DiscountInput; taxPolicy: TaxPolicy; fee?: FeeInput }
 
 export interface QuoteLine {
   serviceId: string; code: string; name: string; pricingModel: PricingModel; quantity: number | null; weightG: number | null;
@@ -21,8 +23,10 @@ export interface QuoteLine {
   discountMinor: bigint; /** after discount, before tax extraction */ amountMinor: bigint; netMinor: bigint; taxMinor: bigint; totalMinor: bigint;
   taxByComponent: Record<string, bigint>;
 }
+export interface QuoteFee { name: string; amountMinor: bigint; netMinor: bigint; taxMinor: bigint; totalMinor: bigint; taxByComponent: Record<string, bigint> }
 export interface Quote {
-  lines: QuoteLine[]; subtotalMinor: bigint; discountMinor: bigint; netMinor: bigint; taxMinor: bigint; totalMinor: bigint;
+  /** Service lines only. netMinor/taxMinor/totalMinor/taxByComponent below INCLUDE the fee. */
+  lines: QuoteLine[]; fee: QuoteFee | null; subtotalMinor: bigint; discountMinor: bigint; netMinor: bigint; taxMinor: bigint; totalMinor: bigint;
   taxByComponent: Record<string, bigint>; priceMode: TaxPolicy['priceMode']; express: boolean;
 }
 
@@ -75,8 +79,10 @@ export function priceQuote(input: QuoteInput, services: Map<string, PricedServic
   const discounts = discount === 0n ? lines.map(() => 0n) : allocate(discount, lines.map((l) => l.base + l.express));
   const amounts = lines.map((l, i) => l.base + l.express - discounts[i]);
 
-  const tax: TaxResult = computeTax(
-    lines.map((l, i) => ({ id: String(i), amountMinor: amounts[i], taxable: l.s.taxCategory === 'taxable' })), input.taxPolicy);
+  const taxLines = lines.map((l, i) => ({ id: String(i), amountMinor: amounts[i], taxable: l.s.taxCategory === 'taxable' }));
+  if (input.fee) taxLines.push({ id: 'fee', amountMinor: input.fee.amountMinor, taxable: input.fee.taxable });
+  const tax: TaxResult = computeTax(taxLines, input.taxPolicy);
+  const feeResult = input.fee ? tax.lines[lines.length] : null;
 
   const out: QuoteLine[] = lines.map((l, i) => ({
     serviceId: l.s.id, code: l.s.code, name: l.s.name, pricingModel: l.s.pricingModel, quantity: l.quantity, weightG: l.weightG,
@@ -84,6 +90,8 @@ export function priceQuote(input: QuoteInput, services: Map<string, PricedServic
     discountMinor: discounts[i], amountMinor: amounts[i], netMinor: tax.lines[i].netMinor, taxMinor: tax.lines[i].taxMinor,
     totalMinor: tax.lines[i].netMinor + tax.lines[i].taxMinor, taxByComponent: tax.lines[i].byComponent,
   }));
-  return { lines: out, subtotalMinor: subtotal, discountMinor: discount, netMinor: tax.netMinor, taxMinor: tax.taxMinor, totalMinor: tax.grossMinor,
+  const fee: QuoteFee | null = input.fee && feeResult ? { name: input.fee.name, amountMinor: input.fee.amountMinor, netMinor: feeResult.netMinor, taxMinor: feeResult.taxMinor,
+    totalMinor: feeResult.netMinor + feeResult.taxMinor, taxByComponent: feeResult.byComponent } : null;
+  return { lines: out, fee, subtotalMinor: subtotal, discountMinor: discount, netMinor: tax.netMinor, taxMinor: tax.taxMinor, totalMinor: tax.grossMinor,
     taxByComponent: tax.byComponent, priceMode: input.taxPolicy.priceMode, express: input.express };
 }

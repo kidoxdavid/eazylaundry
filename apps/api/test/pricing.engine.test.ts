@@ -62,6 +62,19 @@ describe('pricing engine', () => {
     const q = priceQuote({ lines: [{ serviceId: 't' }], express: false, taxPolicy: { ...GST, priceMode: 'inclusive' } }, map(t));
     expect(q.totalMinor).toBe(1050n); expect(q.netMinor).toBe(1000n); expect(q.taxMinor).toBe(50n);
   });
+  it('a delivery fee is added once, taxed per its flag, and never discounted', () => {
+    const a = svc({ id: 'a', pricingModel: 'fixed', price: { unitPriceMinor: 2000n } });
+    const q = priceQuote({ lines: [{ serviceId: 'a' }], express: false, taxPolicy: GST, discount: { type: 'percent', percent: '10' }, fee: { name: 'Delivery', amountMinor: 500n, taxable: true } }, map(a));
+    expect(q.discountMinor).toBe(200n); // 10% of services only
+    expect(q.fee).toMatchObject({ amountMinor: 500n, netMinor: 500n, taxMinor: 25n, totalMinor: 525n });
+    expect(q.taxMinor).toBe(90n + 25n); // 1800 * 5% + 500 * 5%
+    expect(q.totalMinor).toBe(1800n + 500n + 115n);
+    const untaxed = priceQuote({ lines: [{ serviceId: 'a' }], express: false, taxPolicy: GST, fee: { name: 'Delivery', amountMinor: 500n, taxable: false } }, map(a));
+    expect(untaxed.fee!.taxMinor).toBe(0n); expect(untaxed.taxMinor).toBe(100n); expect(untaxed.totalMinor).toBe(2600n);
+    const inc = priceQuote({ lines: [{ serviceId: 'a' }], express: false, taxPolicy: { ...GST, priceMode: 'inclusive' }, fee: { name: 'Delivery', amountMinor: 525n, taxable: true } }, map(a));
+    expect(inc.totalMinor).toBe(2000n + 525n); expect(inc.fee).toMatchObject({ netMinor: 500n, taxMinor: 25n });
+    expect(priceQuote({ lines: [{ serviceId: 'a' }], express: false, taxPolicy: GST }, map(a)).fee).toBeNull();
+  });
   it('percentToRate is exact', () => {
     expect(percentToRate('12.5')).toEqual({ num: 125n, den: 1000n });
   });

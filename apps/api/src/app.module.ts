@@ -29,6 +29,9 @@ import { ProductionController } from './production/production.controller.js';
 import { WorkflowService } from './production/workflow.service.js';
 import { CashController } from './cash/cash.controller.js';
 import { RefundsController } from './cash/refunds.controller.js';
+import { LogisticsController } from './logistics/logistics.controller.js';
+import { TasksService } from './logistics/tasks.service.js';
+import { ZonesService } from './logistics/zones.service.js';
 import { PricingController } from './pricing/pricing.controller.js';
 import { PricingService } from './pricing/pricing.service.js';
 import { CustomersController } from './customers/customers.controller.js';
@@ -42,11 +45,11 @@ export function buildAppModule(cfg: AppConfig) {
       { name: 'default', ttl: 60_000, limit: cfg.throttleLimit },
       { name: 'auth', ttl: 60_000, limit: cfg.authThrottleLimit, skipIf: (ctx) => !Reflect.getMetadata(AUTH_THROTTLE_KEY, ctx.getHandler()) },
     ])],
-    controllers: [HealthController, AuthController, BranchesController, RolesController, MembersController, ConfigController, AuditController, CustomersController, CatalogueController, PricingController, OrdersController, ProductionController, CashController, RefundsController],
+    controllers: [HealthController, AuthController, BranchesController, RolesController, MembersController, ConfigController, AuditController, CustomersController, CatalogueController, PricingController, OrdersController, ProductionController, CashController, RefundsController, LogisticsController],
     providers: [
       { provide: APP_CONFIG, useValue: cfg },
       { provide: FIELD_CIPHER, useValue: new FieldCipher(cfg.encryptionSecret) },
-      AuditService, ConfigService, PricingService, WorkflowService, AuthService, PasswordService, SessionService, TenantsService, AuthorizationService,
+      AuditService, ConfigService, PricingService, WorkflowService, ZonesService, TasksService, AuthService, PasswordService, SessionService, TenantsService, AuthorizationService,
       { provide: APP_GUARD, useClass: ThrottlerGuard },
       { provide: APP_GUARD, useClass: AuthGuard },
       { provide: APP_FILTER, useClass: AllExceptionsFilter },

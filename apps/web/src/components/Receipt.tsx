@@ -23,6 +23,7 @@ export function Receipt({ r }: { r: any }) {
       ))}
       <hr className="border-dashed border-black/40" />
       <div className="flex justify-between"><span>Subtotal</span><span>{fmt(r.subtotalMinor)}</span></div>
+      {r.deliveryFeeMinor > 0 && <div className="flex justify-between"><span>Delivery</span><span>{fmt(r.deliveryFeeMinor)}</span></div>}
       {r.discountMinor > 0 && <div className="flex justify-between"><span>Discount</span><span>-{fmt(r.discountMinor)}</span></div>}
       {Object.entries(r.taxByComponent).map(([k, v]) => <div key={k} className="flex justify-between"><span>{k}{r.priceMode === 'inclusive' ? ' (incl.)' : ''}</span><span>{fmt(v as number)}</span></div>)}
       <div className="flex justify-between text-sm font-bold"><span>TOTAL</span><span>{fmt(r.totalMinor)}</span></div>
