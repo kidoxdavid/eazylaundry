@@ -12,6 +12,7 @@ import type { Actor } from '../common/types.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { DATABASE } from '../db/db.module.js';
 import { WorkflowService } from '../production/workflow.service.js';
+import { EntitlementService } from '../billing/entitlements.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { TasksService, windowSchema } from './tasks.service.js';
 import { ZonesService, compactPostal } from './zones.service.js';
@@ -62,7 +63,7 @@ export class LogisticsController {
   constructor(
     @Inject(DATABASE) private readonly db: Database, @Inject(AuditService) private readonly audit: AuditService, @Inject(ZonesService) private readonly zones: ZonesService,
     @Inject(TasksService) private readonly tasks: TasksService, @Inject(WorkflowService) private readonly workflow: WorkflowService,
-    @Inject(NotificationsService) private readonly notify: NotificationsService,
+    @Inject(NotificationsService) private readonly notify: NotificationsService, @Inject(EntitlementService) private readonly ent: EntitlementService,
   ) {}
 
   /** "Nov 16 08:00–10:00" in the branch's own time zone. */
@@ -82,6 +83,7 @@ export class LogisticsController {
   @RequirePermission('tenant.settings.manage')
   createZone(@CurrentActor() a: Actor, @Body(new ZodPipe(zoneBase)) b: z.infer<typeof zoneBase>) {
     return this.db.withContext(dbCtx(a), async (tx) => {
+      await this.ent.assertModule(tx, a.tenantId!, 'module.delivery');
       const id = uuidv7();
       try {
         await tx.query(`INSERT INTO delivery_zones (id, tenant_id, name, postal_prefixes, min_order_minor, fee_minor, free_over_minor, taxable, active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
@@ -162,6 +164,7 @@ export class LogisticsController {
   @RequireAnyPermission('order.create', 'delivery.dispatch')
   book(@CurrentActor() a: Actor, @Body(new ZodPipe(bookingSchema)) b: z.infer<typeof bookingSchema>) {
     return this.db.withContext(dbCtx(a), async (tx) => {
+      await this.ent.assertModule(tx, a.tenantId!, 'module.delivery');
       if (!canAccessBranch(a, b.branchId)) throw notFound('Branch');
       const br = (await tx.query(`SELECT status FROM branches WHERE id = $1`, [b.branchId])).rows[0];
       if (!br || br.status !== 'active') throw notFound('Branch');

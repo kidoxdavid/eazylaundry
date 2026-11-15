@@ -30,3 +30,12 @@ export const customerApi = {
   patch: <T = any>(p: string, b: unknown) => request<T>('eazy_ccsrf', 'PATCH', p, b),
   del: <T = any>(p: string) => request<T>('eazy_ccsrf', 'DELETE', p),
 };
+
+/** Platform console API (Eazy Group operations): its own session cookie and CSRF token. */
+export const platformApi = {
+  get: <T = any>(p: string) => request<T>('eazy_pcsrf', 'GET', p),
+  post: <T = any>(p: string, b?: unknown) => request<T>('eazy_pcsrf', 'POST', p, b ?? {}),
+  put: <T = any>(p: string, b: unknown) => request<T>('eazy_pcsrf', 'PUT', p, b),
+  patch: <T = any>(p: string, b: unknown) => request<T>('eazy_pcsrf', 'PATCH', p, b),
+  del: <T = any>(p: string) => request<T>('eazy_pcsrf', 'DELETE', p),
+};

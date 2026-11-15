@@ -15,6 +15,7 @@ import type { AppRequest, CustomerActor } from '../common/types.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import type { AppConfig } from '../config.js';
 import { DATABASE } from '../db/db.module.js';
+import { EntitlementService } from '../billing/entitlements.service.js';
 import { ZonesService, compactPostal } from '../logistics/zones.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { CCSRF_COOKIE, CSID_COOKIE, CustomerSessionService } from './customer-session.service.js';
@@ -38,15 +39,17 @@ export class PublicController {
   constructor(
     @Inject(DATABASE) private readonly db: Database, @Inject(APP_CONFIG) private readonly cfg: AppConfig, @Inject(PasswordService) private readonly pw: PasswordService,
     @Inject(CustomerSessionService) private readonly sessions: CustomerSessionService, @Inject(NotificationsService) private readonly notify: NotificationsService,
-    @Inject(ZonesService) private readonly zones: ZonesService,
+    @Inject(ZonesService) private readonly zones: ZonesService, @Inject(EntitlementService) private readonly ent: EntitlementService,
   ) {}
 
   /** Resolves a storefront slug to its business, then continues in THAT business's context. Unknown and inactive businesses look identical. */
   private run<T>(slug: string, fn: (tx: Tx, t: PublicTenant) => Promise<T>): Promise<T> {
     return this.db.withContext({ publicSlug: slug }, async (tx) => {
       const t = (await tx.query(`SELECT id, name, slug, status FROM tenants WHERE slug = $1`, [slug])).rows[0];
-      if (!t || !['trial', 'active'].includes(t.status)) throw notFound('Business');
+      if (!t || !['trial', 'active', 'past_due'].includes(t.status)) throw notFound('Business');
       await tx.query(`SELECT set_config('app.tenant_id', $1, true), set_config('app.public_slug', '', true)`, [t.id]);
+      // A business whose plan has no storefront does not have one: identical to an unknown business.
+      if (!(await this.ent.hasModule(tx, t.id, 'module.storefront'))) throw notFound('Business');
       return fn(tx, { id: t.id, name: t.name, slug: t.slug });
     });
   }

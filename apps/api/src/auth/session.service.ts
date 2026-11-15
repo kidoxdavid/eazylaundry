@@ -50,7 +50,7 @@ export class SessionService {
       actor.mustChangePassword = u.rows[0].must_change_password;
       if (!row.active_tenant_id) return true;
       const m = await tx.query(
-        `SELECT m.id, m.role_id, m.all_branches, r.key AS role_key
+        `SELECT m.id, m.role_id, m.all_branches, r.key AS role_key, t.status AS tenant_status
            FROM user_memberships m
            JOIN roles r ON r.tenant_id = m.tenant_id AND r.id = m.role_id
            JOIN tenants t ON t.id = m.tenant_id
@@ -59,7 +59,7 @@ export class SessionService {
       const mem = m.rows[0];
       if (!mem) return true; // authenticated but no usable membership in the selected tenant
       actor.tenantId = row.active_tenant_id; actor.membershipId = mem.id; actor.roleId = mem.role_id;
-      actor.roleKey = mem.role_key; actor.allBranches = mem.all_branches;
+      actor.roleKey = mem.role_key; actor.tenantStatus = mem.tenant_status; actor.allBranches = mem.all_branches;
       const perms = await tx.query(
         `SELECT permission_code, max_amount_minor FROM role_permissions WHERE role_id = $1`, [mem.role_id]);
       for (const p of perms.rows) actor.permissions.set(p.permission_code, p.max_amount_minor === null ? null : Number(p.max_amount_minor));

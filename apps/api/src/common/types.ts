@@ -7,6 +7,8 @@ export interface Actor {
   mustChangePassword: boolean;
   /** Present only when the session has an active, valid membership. */
   tenantId?: string;
+  /** Lifecycle status of the business (trial, active, past_due, suspended, ...). */
+  tenantStatus?: string;
   membershipId?: string;
   roleId?: string;
   roleKey?: string;
@@ -20,6 +22,7 @@ export interface Actor {
 
 export interface AppRequest extends Request {
   actor?: Actor;
+  platform?: PlatformActor;
   customer?: CustomerActor;
   requestId?: string;
 }
@@ -28,3 +31,5 @@ export interface AppRequest extends Request {
 export interface CustomerActor {
   sessionId: string; accountId: string; customerId: string; tenantId: string; email: string;
 }
+
+export interface PlatformActor { sessionId: string; userId: string; email: string; fullName: string; role: 'platform_admin' | 'billing_ops' | 'support_agent'; ip?: string }

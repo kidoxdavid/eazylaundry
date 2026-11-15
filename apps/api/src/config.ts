@@ -11,6 +11,8 @@ export interface AppConfig {
   authThrottleLimit: number;
   maxFailedLogins: number;
   lockMinutes: number;
+  /** Platform console role: tenant metadata + usage counts only. When unset the platform API is disabled (503). */
+  platformDatabaseUrl?: string;
   /** Least-privilege role used by the background worker. When unset the worker does not run. */
   workerDatabaseUrl?: string;
   workerIntervalMs: number;
@@ -42,6 +44,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     authThrottleLimit: Number(env.AUTH_THROTTLE_LIMIT ?? 10),
     maxFailedLogins: Number(env.MAX_FAILED_LOGINS ?? 5),
     lockMinutes: Number(env.LOCK_MINUTES ?? 15),
+    platformDatabaseUrl: env.DATABASE_PLATFORM_URL || undefined,
     workerDatabaseUrl: env.DATABASE_WORKER_URL || undefined,
     workerIntervalMs: Number(env.WORKER_INTERVAL_MS ?? (env.NODE_ENV === 'test' ? 0 : 5000)),
     smtpUrl: env.SMTP_URL || undefined,

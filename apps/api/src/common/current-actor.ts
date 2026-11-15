@@ -8,3 +8,7 @@ export const CurrentActor = createParamDecorator((_: unknown, ctx: ExecutionCont
 export const CurrentCustomer = createParamDecorator((_: unknown, ctx: ExecutionContext) => {
   return ctx.switchToHttp().getRequest<AppRequest>().customer;
 });
+
+export const CurrentPlatform = createParamDecorator((_: unknown, ctx: ExecutionContext) => {
+  return ctx.switchToHttp().getRequest<AppRequest>().platform;
+});

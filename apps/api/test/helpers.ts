@@ -11,6 +11,7 @@ export const PASSWORD = 'correct-horse-battery';
 export async function makeApp(over: Record<string, string> = {}) {
   const cfg = loadConfig({
     DATABASE_URL: APP_URL, NODE_ENV: 'test', APP_ENCRYPTION_SECRET: 'test-secret', THROTTLE_LIMIT: '100000', DATABASE_WORKER_URL: process.env.TEST_DATABASE_WORKER_URL ?? 'postgres://eazy_worker:eazy_worker_dev@localhost:5432/eazylaundry_test',
+    DATABASE_PLATFORM_URL: process.env.TEST_DATABASE_PLATFORM_URL ?? 'postgres://eazy_platform:eazy_platform_dev@localhost:5432/eazylaundry_test',
     AUTH_THROTTLE_LIMIT: '100000', ...over,
   } as any);
   const app = await createApp(cfg);
@@ -35,7 +36,7 @@ export class Client {
   }
   req(method: 'get' | 'post' | 'put' | 'patch' | 'delete', url: string, body?: unknown, opts: { csrf?: boolean } = {}) {
     let r = (request(this.app.getHttpServer()) as any)[method](url).set('Cookie', this.header());
-    const csrf = this.cookies.eazy_csrf ?? this.cookies.eazy_ccsrf;
+    const csrf = this.cookies.eazy_csrf ?? this.cookies.eazy_ccsrf ?? this.cookies.eazy_pcsrf;
     if (opts.csrf !== false && csrf) r = r.set('x-csrf-token', csrf);
     if (body !== undefined) r = r.send(body);
     return r.then((res: request.Response) => this.absorb(res));
@@ -81,6 +82,7 @@ export async function ownerQuery<T = any>(sql: string, params: unknown[] = []) {
   try { return (await c.query(sql, params)).rows as T[]; } finally { await c.end(); }
 }
 export const WORKER_URL = process.env.TEST_DATABASE_WORKER_URL ?? 'postgres://eazy_worker:eazy_worker_dev@localhost:5432/eazylaundry_test';
+export const PLATFORM_URL = process.env.TEST_DATABASE_PLATFORM_URL ?? 'postgres://eazy_platform:eazy_platform_dev@localhost:5432/eazylaundry_test';
 export { APP_URL, OWNER_URL };
 
 /** POST with an Idempotency-Key header (the cookie-jar client does not set one). */

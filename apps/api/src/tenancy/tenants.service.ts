@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Database, ROLE_TEMPLATES } from '@eazy/database';
 import { AuditService } from '../audit/audit.service.js';
+import { TRIAL_DAYS, TRIAL_PLAN } from '../billing/entitlements.service.js';
 import { PasswordService } from '../auth/password.service.js';
 import { conflict } from '../common/errors.js';
 import { uuidv7 } from '../common/ids.js';
@@ -58,6 +59,7 @@ export class TenantsService {
           // Seed data (editable by the business, not logic): default price list and Alberta GST.
           await tx.query(`INSERT INTO price_lists (id, tenant_id, name, kind, is_default) VALUES ($1,$2,'Standard','standard',true)`, [uuidv7(), tenantId]);
           await tx.query(`INSERT INTO tax_rates (id, tenant_id, code, name, rate, effective_from) VALUES ($1,$2,'GST','GST',0.05,'2000-01-01')`, [uuidv7(), tenantId]);
+          await tx.query(`INSERT INTO subscriptions (tenant_id, plan_id, trial_ends_at) SELECT $1, id, now() + make_interval(days => $3) FROM subscription_plans WHERE code = $2`, [tenantId, TRIAL_PLAN, TRIAL_DAYS]);
           const membershipId = uuidv7();
           await tx.query(`INSERT INTO user_memberships (id, tenant_id, user_id, role_id, all_branches) VALUES ($1,$2,$3,$4,true)`,
             [membershipId, tenantId, userId, ownerRoleId]);

@@ -11,6 +11,7 @@ import { uuidv7 } from '../common/ids.js';
 import type { Actor } from '../common/types.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { DATABASE } from '../db/db.module.js';
+import { EntitlementService } from '../billing/entitlements.service.js';
 import { ConfigService } from '../config/config.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { TasksService, windowSchema } from '../logistics/tasks.service.js';
@@ -71,7 +72,8 @@ export class OrdersController {
   constructor(@Inject(DATABASE) private readonly db: Database, @Inject(AuditService) private readonly audit: AuditService,
               @Inject(PricingService) private readonly pricing: PricingService, @Inject(WorkflowService) private readonly workflow: WorkflowService,
               @Inject(ConfigService) private readonly cfg: ConfigService,
-              @Inject(TasksService) private readonly tasks: TasksService, @Inject(NotificationsService) private readonly notify: NotificationsService) {}
+              @Inject(TasksService) private readonly tasks: TasksService, @Inject(NotificationsService) private readonly notify: NotificationsService,
+              @Inject(EntitlementService) private readonly ent: EntitlementService) {}
 
   private async event(tx: Tx, a: Actor, order: { id: string; branch_id: string }, type: string, payload: Record<string, unknown> = {}, note?: string) {
     await tx.query(`INSERT INTO order_events (id, tenant_id, branch_id, order_id, type, actor_user_id, note, payload) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
@@ -127,6 +129,7 @@ export class OrdersController {
         if (cust.archived_at) throw new AppError(422, 'CUSTOMER_ARCHIVED', 'This customer is archived');
 
         const ctx = await this.pricing.quote(tx, a, b);
+        if (ctx.delivery) await this.ent.assertModule(tx, a.tenantId!, 'module.delivery');
         const q = ctx.quote;
         if (b.payment && b.payment.amountMinor > Number(q.totalMinor)) throw new AppError(422, 'OVERPAYMENT', 'The payment is more than the order total');
 

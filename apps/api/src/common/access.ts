@@ -6,7 +6,8 @@ export type Access =
   | { kind: 'authenticated' } // any signed-in user, tenant not required
   | { kind: 'permission'; codes: string[] }
   | { kind: 'any'; codes: string[] }
-  | { kind: 'customer' };
+  | { kind: 'customer' }
+  | { kind: 'platform'; roles: string[] };
 
 /** No auth. Use sparingly: health, login, registration. */
 export const Public = () => SetMetadata(ACCESS_KEY, { kind: 'public' } satisfies Access);
@@ -25,3 +26,6 @@ export const RequireAnyPermission = (...codes: string[]) => SetMetadata(ACCESS_K
 
 /** A signed-in storefront customer (separate cookie and session store from staff). */
 export const CustomerOnly = () => SetMetadata(ACCESS_KEY, { kind: 'customer' } satisfies Access);
+
+/** Eazy Group SaaS operations (separate realm from businesses). With no roles listed, any platform user may call it. */
+export const PlatformOnly = (...roles: string[]) => SetMetadata(ACCESS_KEY, { kind: 'platform', roles } satisfies Access);

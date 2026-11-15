@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "platform:create-admin": "tsx src/platform/create-admin.ts"
   },
   "dependencies": {
     "@eazy/database": "workspace:*",

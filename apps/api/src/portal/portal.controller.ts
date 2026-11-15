@@ -13,6 +13,7 @@ import { addressSchema } from '../customers/customers.controller.js';
 import { DATABASE } from '../db/db.module.js';
 import { TasksService, windowSchema } from '../logistics/tasks.service.js';
 import { ZonesService } from '../logistics/zones.service.js';
+import { EntitlementService } from '../billing/entitlements.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { buildReceipt } from '../orders/orders.controller.js';
 
@@ -38,6 +39,7 @@ export class PortalController {
   constructor(
     @Inject(DATABASE) private readonly db: Database, @Inject(AuditService) private readonly audit: AuditService, @Inject(TasksService) private readonly tasks: TasksService,
     @Inject(ZonesService) private readonly zones: ZonesService, @Inject(NotificationsService) private readonly notify: NotificationsService,
+    @Inject(EntitlementService) private readonly ent: EntitlementService,
   ) {}
 
   private async addresses(tx: Tx) {
@@ -100,6 +102,7 @@ export class PortalController {
   @CustomerOnly()
   book(@CurrentCustomer() c: CustomerActor, @Body(new ZodPipe(bookingSchema)) b: z.infer<typeof bookingSchema>) {
     return this.db.withContext(ctx(c), async (tx) => {
+      await this.ent.assertModule(tx, c.tenantId, 'module.delivery');
       const ad = (await tx.query(`SELECT line1, line2, city, province, postal_code, delivery_instructions FROM customer_addresses WHERE id = $1 AND customer_id = $2`, [b.addressId, c.customerId])).rows[0];
       if (!ad) throw notFound('Address');
       const open = (await tx.query(`SELECT count(*)::int AS n FROM delivery_tasks WHERE customer_id = $1 AND kind = 'pickup' AND status IN ('requested','assigned','en_route')`, [c.customerId])).rows[0].n;

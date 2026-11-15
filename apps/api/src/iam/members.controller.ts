@@ -11,6 +11,7 @@ import { conflict, forbidden, notFound } from '../common/errors.js';
 import { uuidv7 } from '../common/ids.js';
 import type { Actor } from '../common/types.js';
 import { ZodPipe } from '../common/zod.pipe.js';
+import { EntitlementService } from '../billing/entitlements.service.js';
 import { DATABASE } from '../db/db.module.js';
 import { AuthorizationService } from './authorization.service.js';
 
@@ -28,7 +29,7 @@ export class MembersController {
   constructor(
     @Inject(DATABASE) private readonly db: Database, @Inject(AuditService) private readonly audit: AuditService,
     @Inject(AuthorizationService) private readonly authz: AuthorizationService, @Inject(PasswordService) private readonly pw: PasswordService,
-    @Inject(SessionService) private readonly sessions: SessionService,
+    @Inject(SessionService) private readonly sessions: SessionService, @Inject(EntitlementService) private readonly ent: EntitlementService,
   ) {}
 
   @Get()
@@ -56,6 +57,7 @@ export class MembersController {
   @RequirePermission('member.manage')
   create(@CurrentActor() a: Actor, @Body(new ZodPipe(createSchema)) b: z.infer<typeof createSchema>) {
     return this.pw.hash(b.temporaryPassword).then((hash) => this.db.withContext(dbCtx(a), async (tx) => {
+      await this.ent.assertLimit(tx, a.tenantId!, 'limit.staff_seats', Number((await tx.query(`SELECT count(*) AS n FROM user_memberships WHERE status = 'active'`)).rows[0].n));
       const { grants } = await this.rolePerms(tx, b.roleId);
       this.authz.assertCanGrant(a, grants);
       this.authz.assertBranchScope(a, b.allBranches, b.branchIds);
@@ -81,6 +83,9 @@ export class MembersController {
       const m = (await tx.query(`SELECT id, user_id, role_id, status, all_branches FROM user_memberships WHERE id = $1 FOR UPDATE`, [id])).rows[0];
       if (!m) throw notFound('Member');
       if (m.id === a.membershipId || m.user_id === a.userId) throw forbidden('SELF_MODIFICATION', 'You cannot change your own membership');
+      if (b.status === 'active' && m.status !== 'active') {
+        await this.ent.assertLimit(tx, a.tenantId!, 'limit.staff_seats', Number((await tx.query(`SELECT count(*) AS n FROM user_memberships WHERE status = 'active'`)).rows[0].n));
+      }
       const target = await this.rolePerms(tx, m.role_id);
       this.authz.assertCanManageRolePerms(a, target.grants);
       if (b.roleId && b.roleId !== m.role_id) {

@@ -3,6 +3,8 @@ import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-rou
 import { useAuth } from './auth';
 import { Button } from './components/ui';
 import { Audit } from './pages/Audit';
+import { Billing, BillingBanner } from './pages/Billing';
+import { PlatformApp } from './platform/PlatformApp';
 import { Branches } from './pages/Branches';
 import { CustomerDetail, Customers } from './pages/Customers';
 import { ChangePassword, Login, Register } from './pages/Auth';
@@ -65,6 +67,7 @@ function Shell() {
     { to: '/roles', label: 'Roles', show: can('role.read') },
     { to: '/zones', label: 'Delivery zones', show: can('tenant.settings.manage') },
     { to: '/settings', label: 'Settings', show: can('config.read') },
+    { to: '/billing', label: 'Plan & billing', show: can('billing.read') },
     { to: '/audit', label: 'Audit log', show: can('audit.read') },
   ].filter((i) => i.show);
   const active = me.memberships.find((m) => m.tenantId === me.active?.tenantId);
@@ -104,7 +107,7 @@ function Shell() {
         <div className="px-4 py-4 text-base font-semibold text-accent">EazyLaundry</div>
         <NavItems items={items} />{account}
       </aside>
-      <main className="min-w-0 flex-1 overflow-auto p-4 md:p-6"><Outlet /></main>
+      <main className="min-w-0 flex-1 overflow-auto p-4 md:p-6"><BillingBanner me={me} /><Outlet /></main>
     </div>
   );
 }
@@ -112,6 +115,8 @@ function Shell() {
 export function App() {
   const { loading } = useAuth();
   const loc = useLocation();
+  // The platform console is its own realm (separate sign-in and session); it never waits on staff authentication.
+  if (loc.pathname.startsWith('/platform')) return <Routes><Route path="/platform/*" element={<PlatformApp />} /></Routes>;
   // The customer storefront is a separate app surface with its own sign-in; it never waits on staff authentication.
   if (loc.pathname.startsWith('/b/')) return <Routes><Route path="/b/:slug/*" element={<Storefront />} /></Routes>;
   if (loading) return <div className="p-8 text-muted" role="status">Loading…</div>;
@@ -138,6 +143,7 @@ export function App() {
         <Route path="team" element={<Team />} />
         <Route path="roles" element={<Roles />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="billing" element={<Billing />} />
         <Route path="audit" element={<Audit />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

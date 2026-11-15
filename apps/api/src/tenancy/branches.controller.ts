@@ -9,6 +9,7 @@ import { notFound } from '../common/errors.js';
 import { uuidv7 } from '../common/ids.js';
 import type { Actor } from '../common/types.js';
 import { ZodPipe } from '../common/zod.pipe.js';
+import { EntitlementService } from '../billing/entitlements.service.js';
 import { DATABASE } from '../db/db.module.js';
 import { PROVINCES, postalCode } from '../common/canada.js';
 
@@ -24,7 +25,8 @@ const map = (r: any) => ({ id: r.id, code: r.code, name: r.name, address: r.addr
 
 @Controller('branches')
 export class BranchesController {
-  constructor(@Inject(DATABASE) private readonly db: Database, @Inject(AuditService) private readonly audit: AuditService) {}
+  constructor(@Inject(DATABASE) private readonly db: Database, @Inject(AuditService) private readonly audit: AuditService,
+              @Inject(EntitlementService) private readonly ent: EntitlementService) {}
 
   @Get()
   @RequirePermission('branch.read')
@@ -39,6 +41,7 @@ export class BranchesController {
   @RequirePermission('branch.manage')
   create(@CurrentActor() a: Actor, @Body(new ZodPipe(createSchema)) b: z.infer<typeof createSchema>) {
     return this.db.withContext(dbCtx(a), async (tx) => {
+      await this.ent.assertLimit(tx, a.tenantId!, 'limit.branches', Number((await tx.query(`SELECT count(*) AS n FROM branches WHERE status = 'active'`)).rows[0].n));
       const id = uuidv7();
       const r = await tx.query(`INSERT INTO branches (id, tenant_id, code, name, address, timezone) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
         [id, a.tenantId, b.code, b.name, JSON.stringify(b.address), b.timezone]);
@@ -52,6 +55,10 @@ export class BranchesController {
   update(@CurrentActor() a: Actor, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(patchSchema)) b: z.infer<typeof patchSchema>) {
     return this.db.withContext(dbCtx(a), async (tx) => {
       if (!canAccessBranch(a, id)) throw notFound('Branch');
+      if (b.status === 'active' && (await tx.query(`SELECT 1 FROM branches WHERE id = $1 AND status = 'archived'`, [id])).rowCount) {
+        // restoring an archived branch uses a branch slot again
+        await this.ent.assertLimit(tx, a.tenantId!, 'limit.branches', Number((await tx.query(`SELECT count(*) AS n FROM branches WHERE status = 'active'`)).rows[0].n));
+      }
       const r = await tx.query(
         `UPDATE branches SET name = coalesce($2, name), address = coalesce($3, address), timezone = coalesce($4, timezone),
                 status = coalesce($5, status) WHERE id = $1 RETURNING *`,

@@ -78,7 +78,7 @@ export class AuthService {
       user: { id: user.id, email: user.email, fullName: user.full_name, mfaEnabled: user.mfa_enabled, mustChangePassword: user.must_change_password },
       memberships: await this.listMemberships(actor.userId),
       active: actor.tenantId ? {
-        tenantId: actor.tenantId, role: actor.roleKey, allBranches: actor.allBranches, branchIds: actor.branchIds,
+        tenantId: actor.tenantId, status: actor.tenantStatus, role: actor.roleKey, allBranches: actor.allBranches, branchIds: actor.branchIds,
         permissions: [...actor.permissions.entries()].map(([code, max]) => ({ code, maxAmountMinor: max })),
       } : null,
     };

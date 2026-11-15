@@ -34,6 +34,9 @@ export class CustomerSessionService {
     const a = (await this.db.withContext({ tenantId: s.tenant_id, customerId: s.customer_id, allBranches: true }, (tx) => tx.query(
       `SELECT ca.email, ca.status FROM customer_accounts ca WHERE ca.id = $1 AND ca.customer_id = $2`, [s.account_id, s.customer_id]))).rows[0];
     if (!a || a.status !== 'active') return null;
+    // A suspended or cancelled business takes no new portal activity.
+    const t = (await this.db.withContext({ tenantId: s.tenant_id }, (tx) => tx.query(`SELECT status FROM tenants WHERE id = $1`, [s.tenant_id]))).rows[0];
+    if (!t || !['trial', 'active', 'past_due'].includes(t.status)) return null;
     return { sessionId: s.id, accountId: s.account_id, customerId: s.customer_id, tenantId: s.tenant_id, email: a.email };
   }
 
