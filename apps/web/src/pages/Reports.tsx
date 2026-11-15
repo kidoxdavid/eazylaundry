@@ -22,7 +22,7 @@ function csv(name: string, head: string[], rows: (string | number)[][]) {
 }
 
 const Stat = ({ label, value, sub }: { label: string; value: ReactNode; sub?: string }) => (
-  <div className="rounded-lg border border-line bg-white p-3"><div className="text-xs text-muted">{label}</div><div className="text-xl font-semibold">{value}</div>{sub && <div className="text-xs text-muted">{sub}</div>}</div>
+  <div className="card p-3"><div className="text-xs text-muted">{label}</div><div className="text-xl font-semibold">{value}</div>{sub && <div className="text-xs text-muted">{sub}</div>}</div>
 );
 
 /** Dependency-free bar chart: accessible via the table below it, never the only way to read the numbers. */
@@ -30,7 +30,7 @@ function Bars({ data, label }: { data: { key: string; value: number }[]; label: 
   const max = Math.max(1, ...data.map((d) => d.value));
   if (!data.length) return null;
   return (
-    <div role="img" aria-label={label} className="flex h-32 items-end gap-1 rounded-lg border border-line bg-white p-3">
+    <div role="img" aria-label={label} className="flex h-32 items-end gap-1 card p-3">
       {data.map((d) => <div key={d.key} title={`${d.key}: ${fmt(d.value)}`} className="min-w-[3px] max-w-[40px] flex-1 rounded-t bg-accent" style={{ height: `${Math.max(2, (d.value / max) * 100)}%` }} />)}
     </div>
   );
@@ -47,11 +47,11 @@ function Sales({ qs }: { qs: string }) {
         <Bars label="Billed per day" data={r.daily.map((d: any) => ({ key: d.day, value: d.totalMinor }))} />
         <section><div className="mb-2 flex items-center justify-between"><h2 className="font-semibold">By day</h2>
           <Button variant="ghost" className="h-9 px-3 md:h-8" onClick={() => csv(`sales-${r.from}-${r.to}.csv`, ['Date', 'Orders', 'Before tax (CAD)', 'Tax (CAD)', 'Total (CAD)', 'Discounts (CAD)', 'Delivery fees (CAD)'], r.daily.map((d: any) => [d.day, d.orders, d.netMinor / 100, d.taxMinor / 100, d.totalMinor / 100, d.discountMinor / 100, d.deliveryFeeMinor / 100]))}>Download CSV</Button></div>
-          <ul className="divide-y divide-line rounded-lg border border-line bg-white text-sm">{r.daily.map((d: any) => <li key={d.day} className="flex justify-between gap-2 p-3"><span>{d.day} <span className="text-muted">· {d.orders} order{d.orders === 1 ? '' : 's'}</span></span><b>{fmt(d.totalMinor)}</b></li>)}
+          <ul className="divide-y divide-line card text-sm">{r.daily.map((d: any) => <li key={d.day} className="flex justify-between gap-2 p-3"><span>{d.day} <span className="text-muted">· {d.orders} order{d.orders === 1 ? '' : 's'}</span></span><b>{fmt(d.totalMinor)}</b></li>)}
             {!r.daily.length && <li className="p-3 text-muted">No orders in this period.</li>}</ul></section>
         {r.topServices.length > 0 && <section><h2 className="mb-2 font-semibold">Top services</h2>
-          <ul className="divide-y divide-line rounded-lg border border-line bg-white text-sm">{r.topServices.map((s: any) => <li key={s.code} className="flex justify-between gap-2 p-3"><span>{s.name} <span className="text-muted">· {s.orders} order{s.orders === 1 ? '' : 's'}{s.weightG ? ` · ${(s.weightG / 1000).toFixed(1)} kg` : ''}{s.quantity ? ` · ${s.quantity} items` : ''}</span></span><b>{fmt(s.netMinor)}</b></li>)}</ul></section>}
-        {r.bySource.length > 1 && <section><h2 className="mb-2 font-semibold">By channel</h2><ul className="divide-y divide-line rounded-lg border border-line bg-white text-sm">{r.bySource.map((s: any) => <li key={s.source} className="flex justify-between p-3"><span className="capitalize">{s.source}</span><span>{s.orders} · <b>{fmt(s.totalMinor)}</b></span></li>)}</ul></section>}
+          <ul className="divide-y divide-line card text-sm">{r.topServices.map((s: any) => <li key={s.code} className="flex justify-between gap-2 p-3"><span>{s.name} <span className="text-muted">· {s.orders} order{s.orders === 1 ? '' : 's'}{s.weightG ? ` · ${(s.weightG / 1000).toFixed(1)} kg` : ''}{s.quantity ? ` · ${s.quantity} items` : ''}</span></span><b>{fmt(s.netMinor)}</b></li>)}</ul></section>}
+        {r.bySource.length > 1 && <section><h2 className="mb-2 font-semibold">By channel</h2><ul className="divide-y divide-line card text-sm">{r.bySource.map((s: any) => <li key={s.source} className="flex justify-between p-3"><span className="capitalize">{s.source}</span><span>{s.orders} · <b>{fmt(s.totalMinor)}</b></span></li>)}</ul></section>}
       </>}
     </div>
   );
@@ -65,11 +65,11 @@ function Collections({ qs }: { qs: string }) {
         <div className="grid grid-cols-3 gap-2"><Stat label="Collected" value={fmt(r.totals.collectedMinor)} /><Stat label="Refunded" value={fmt(r.totals.refundedMinor)} /><Stat label="Net" value={fmt(r.totals.netMinor)} /></div>
         <Bars label="Net collected per day" data={r.daily.map((d: any) => ({ key: d.day, value: Math.max(0, d.netMinor) }))} />
         <section><h2 className="mb-2 font-semibold">By payment method</h2>
-          <ul className="divide-y divide-line rounded-lg border border-line bg-white text-sm">{r.byMethod.map((m: any) => <li key={m.method} className="flex flex-wrap justify-between gap-x-3 p-3"><span>{METHODS[m.method] ?? m.method}</span><span>{fmt(m.collectedMinor)}{m.refundedMinor > 0 && <span className="text-danger"> − {fmt(m.refundedMinor)}</span>} = <b>{fmt(m.netMinor)}</b></span></li>)}
+          <ul className="divide-y divide-line card text-sm">{r.byMethod.map((m: any) => <li key={m.method} className="flex flex-wrap justify-between gap-x-3 p-3"><span>{METHODS[m.method] ?? m.method}</span><span>{fmt(m.collectedMinor)}{m.refundedMinor > 0 && <span className="text-danger"> − {fmt(m.refundedMinor)}</span>} = <b>{fmt(m.netMinor)}</b></span></li>)}
             {!r.byMethod.length && <li className="p-3 text-muted">No payments in this period.</li>}</ul></section>
         <section><div className="mb-2 flex items-center justify-between"><h2 className="font-semibold">By day</h2>
           <Button variant="ghost" className="h-9 px-3 md:h-8" onClick={() => csv(`collections-${r.from}-${r.to}.csv`, ['Date', 'Collected (CAD)', 'Refunded (CAD)', 'Net (CAD)'], r.daily.map((d: any) => [d.day, d.collectedMinor / 100, d.refundedMinor / 100, d.netMinor / 100]))}>Download CSV</Button></div>
-          <ul className="divide-y divide-line rounded-lg border border-line bg-white text-sm">{r.daily.map((d: any) => <li key={d.day} className="flex justify-between gap-2 p-3"><span>{d.day}</span><b>{fmt(d.netMinor)}</b></li>)}</ul></section>
+          <ul className="divide-y divide-line card text-sm">{r.daily.map((d: any) => <li key={d.day} className="flex justify-between gap-2 p-3"><span>{d.day}</span><b>{fmt(d.netMinor)}</b></li>)}</ul></section>
         <p className="text-xs text-muted">By payment date. Cash here is cash received; till counts and variances are on the Till page.</p>
       </>}
     </div>
@@ -84,7 +84,7 @@ function Receivables({ branchId }: { branchId: string }) {
         <div className="grid grid-cols-2 gap-2"><Stat label="Owed to you" value={fmt(r.totals.owedMinor)} /><Stat label="Unpaid orders" value={r.totals.orders} /></div>
         <div className="grid grid-cols-3 gap-2">{r.buckets.map((b: any) => <Stat key={b.bucket} label={`${b.bucket} days old`} value={fmt(b.owedMinor)} sub={`${b.orders} order${b.orders === 1 ? '' : 's'}`} />)}</div>
         <section><h2 className="mb-2 font-semibold">Largest balances</h2>
-          <ul className="divide-y divide-line rounded-lg border border-line bg-white text-sm">{r.top.map((o: any) => (
+          <ul className="divide-y divide-line card text-sm">{r.top.map((o: any) => (
             <li key={o.id}><Link to={`/orders/${o.id}`} className="flex items-center justify-between gap-2 p-3 active:bg-surface"><span><b>{o.orderNo}</b> · {o.customerName}<span className="block text-xs text-muted">{o.ageDays} day{o.ageDays === 1 ? '' : 's'} old · <Badge>{o.status}</Badge></span></span><b className="text-danger">{fmt(o.owedMinor)}</b></Link></li>))}
             {!r.top.length && <li className="p-3 text-muted">Nothing is owed. All orders are settled.</li>}</ul></section>
       </>}
@@ -102,7 +102,7 @@ function Operations({ qs }: { qs: string }) {
         <h2 className="font-semibold">In this period</h2>
         <div className="grid grid-cols-2 gap-2"><Stat label="Orders handed over" value={r.completed.orders} sub={r.completed.averageHoursToHandover === null ? undefined : `avg ${r.completed.averageHoursToHandover} h from order`} /><Stat label="On time" value={r.completed.onTimePercent === null ? '—' : `${r.completed.onTimePercent}%`} sub="handed over by promised time" />
           <Stat label="Quality checks" value={r.quality.inspections} /><Stat label="Failed QC" value={r.quality.failPercent === null ? '—' : `${r.quality.failPercent}%`} sub={`${r.quality.failed} failed`} /></div>
-        {r.quality.reasons.length > 0 && <ul className="divide-y divide-line rounded-lg border border-line bg-white text-sm">{r.quality.reasons.map((x: any) => <li key={x.reason} className="flex justify-between p-3"><span>{String(x.reason).replace(/_/g, ' ')}</span><b>{x.count}</b></li>)}</ul>}
+        {r.quality.reasons.length > 0 && <ul className="divide-y divide-line card text-sm">{r.quality.reasons.map((x: any) => <li key={x.reason} className="flex justify-between p-3"><span>{String(x.reason).replace(/_/g, ' ')}</span><b>{x.count}</b></li>)}</ul>}
       </>}
     </div>
   );

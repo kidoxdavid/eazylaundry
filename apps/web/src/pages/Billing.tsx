@@ -38,20 +38,20 @@ export function Billing() {
       <ErrorBanner error={q.error} />
       {b && (
         <div className="space-y-4">
-          <section className="space-y-2 rounded-lg border border-line bg-white p-4">
+          <section className="space-y-2 card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-semibold">{b.plan.name}</h2><Badge tone={STATUS[b.status]?.tone ?? 'neutral'}>{STATUS[b.status]?.label ?? b.status}</Badge></div>
             <p className="text-muted">{b.plan.priceMinor === null ? 'Custom pricing' : `${fmt(b.plan.priceMinor)} CAD per ${b.plan.interval}`} (plus tax)</p>
             {b.status === 'trial' && <p>Free trial: <b>{b.trialDaysLeft} day{b.trialDaysLeft === 1 ? '' : 's'}</b> left{b.trialEndsAt ? ` (ends ${dateTime(b.trialEndsAt)})` : ''}. During your trial you have full access.</p>}
             {b.currentPeriodEnd && <p className="text-sm text-muted">Current period ends {dateTime(b.currentPeriodEnd)}{b.cancelAtPeriodEnd ? ' — cancels at that date' : ''}</p>}
             <p className="rounded-md bg-surface p-3 text-sm">To change your plan, update payment details or cancel, contact support. Self-service plan changes and online payment of your subscription are coming soon.</p>
           </section>
-          <section className="space-y-3 rounded-lg border border-line bg-white p-4"><h2 className="font-semibold">Usage</h2>
+          <section className="space-y-3 card p-4"><h2 className="font-semibold">Usage</h2>
             <Meter label="Branches" used={b.usage.branches} limit={b.limits.branches} /><Meter label="Staff members" used={b.usage.staffSeats} limit={b.limits.staffSeats} />
             <p className="text-sm text-muted">{b.usage.ordersThisMonth} orders this month. Orders are never limited or charged per order.</p>
             {((b.limits.branches !== null && b.usage.branches > b.limits.branches) || (b.limits.staffSeats !== null && b.usage.staffSeats > b.limits.staffSeats)) &&
               <p role="status" className="rounded-md bg-amber-50 p-3 text-sm text-warning">You are over your plan's limit. Nothing has been removed, but you cannot add more until you upgrade or reduce usage.</p>}
           </section>
-          <section className="rounded-lg border border-line bg-white p-4"><h2 className="mb-2 font-semibold">Included</h2>
+          <section className="card p-4"><h2 className="mb-2 font-semibold">Included</h2>
             <ul className="divide-y divide-line">{MODULES.map(([k, l]) => <li key={k} className="flex justify-between py-2"><span>{l}</span><Badge tone={b.entitlements[k] ? 'success' : 'neutral'}>{b.entitlements[k] ? 'included' : 'not in your plan'}</Badge></li>)}
               <li className="flex justify-between py-2"><span>Reports</span><Badge>{String(b.entitlements['feature.reports'] ?? '—')}</Badge></li></ul></section>
         </div>

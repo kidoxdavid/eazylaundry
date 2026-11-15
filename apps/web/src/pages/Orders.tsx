@@ -30,11 +30,11 @@ export function Orders() {
         <label className="flex min-h-[44px] items-center gap-2"><input type="checkbox" className="h-5 w-5" checked={unpaid} onChange={(e) => setUnpaid(e.target.checked)} /> Unpaid only</label>
       </div>
       <ErrorBanner error={list.error} />
-      {list.isSuccess && !items.length && <p className="rounded-lg border border-line bg-white p-4 text-muted">No orders match.</p>}
+      {list.isSuccess && !items.length && <p className="card p-4 text-muted">No orders match.</p>}
 
       <ul className="space-y-2 md:hidden">
         {items.map((o: any) => (
-          <li key={o.id}><Link to={`/orders/${o.id}`} className="block rounded-lg border border-line bg-white p-3 active:bg-surface">
+          <li key={o.id}><Link to={`/orders/${o.id}`} className="block card p-3 active:bg-surface">
             <div className="flex items-start justify-between gap-2"><span className="font-semibold">{o.orderNo}</span><span className="font-semibold">{fmt(o.totalMinor)}</span></div>
             <div className="text-sm text-muted">{o.customerName}</div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5"><Badge tone={STATUS_TONE[o.status]}>{o.stageName ?? o.status}</Badge><Badge tone={PAY_TONE[o.paymentStatus]}>{o.paymentStatus}</Badge>
@@ -42,7 +42,7 @@ export function Orders() {
           </Link></li>
         ))}
       </ul>
-      <div className="hidden overflow-x-auto rounded-lg border border-line bg-white md:block">
+      <div className="hidden overflow-x-auto card md:block">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-line bg-surface text-xs uppercase tracking-wide text-muted"><tr>{['Order', 'Customer', 'Created', 'Promised', 'Status', 'Payment', 'Total'].map((h, i) => <th key={h} className={`px-3 py-2 font-medium ${i === 6 ? 'text-right' : ''}`}>{h}</th>)}</tr></thead>
           <tbody className="divide-y divide-line">{items.map((o: any) => (
@@ -80,20 +80,20 @@ export function OrderDetail() {
       {o.status === 'cancelled' && <p className="mb-4 rounded-md bg-red-50 p-3 text-danger">Cancelled: {o.cancelledReason}</p>}
 
       {o.delivery && (
-        <section className="mb-4 rounded-lg border border-line bg-white p-4" aria-label="Delivery"><div className="mb-1 flex items-center justify-between"><h2 className="font-semibold">Delivery</h2><Badge tone={o.delivery.status === 'completed' ? 'success' : o.delivery.status === 'failed' ? 'danger' : 'neutral'}>{o.delivery.status.replace('_', ' ')}</Badge></div>
+        <section className="mb-4 card p-4" aria-label="Delivery"><div className="mb-1 flex items-center justify-between"><h2 className="font-semibold">Delivery</h2><Badge tone={o.delivery.status === 'completed' ? 'success' : o.delivery.status === 'failed' ? 'danger' : 'neutral'}>{o.delivery.status.replace('_', ' ')}</Badge></div>
           <p className="text-sm">{dateTime(o.delivery.windowStart)} – {new Date(o.delivery.windowEnd).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}</p>
           <p className="text-sm text-muted">{o.delivery.driverName ? `Driver: ${o.delivery.driverName}` : 'No driver assigned yet'}{o.delivery.feeMinor ? ` · fee ${fmt(o.delivery.feeMinor)}` : ''}{o.delivery.attempts ? ` · ${o.delivery.attempts} failed attempt(s)` : ''}</p></section>
       )}
 
       {prod.data && (
-        <section className="mb-4 space-y-3 rounded-lg border border-line bg-white p-4" aria-labelledby="prod-h">
+        <section className="mb-4 space-y-3 card p-4" aria-labelledby="prod-h">
           <div className="flex flex-wrap items-center justify-between gap-2"><h2 id="prod-h" className="font-semibold">Production</h2><OrderBadges o={prod.data} /></div>
           <StageTracker stages={prod.data.stages} />
           <OrderActions card={prod.data} onChanged={refresh} />
         </section>
       )}
 
-      <section className="mb-4 rounded-lg border border-line bg-white p-4"><h2 className="mb-2 font-semibold">Items</h2>
+      <section className="mb-4 card p-4"><h2 className="mb-2 font-semibold">Items</h2>
         <ul className="divide-y divide-line">{o.lines.map((l: any) => (
           <li key={l.lineNo} className="flex justify-between gap-3 py-2"><div><div className="font-medium">{l.name}</div>
             <div className="text-sm text-muted">{l.pricingModel === 'per_kg' ? `${(l.weightG / 1000).toFixed(2)} kg` : `Qty ${l.quantity}`} × {fmt(l.unitPriceMinor)}{l.expressMinor ? ` · express ${fmt(l.expressMinor)}` : ''}</div></div>
@@ -110,7 +110,7 @@ export function OrderDetail() {
         <p className="mt-2 text-sm text-muted">Promised {dateTime(o.promisedAt)}</p>
       </section>
 
-      <section className="mb-4 rounded-lg border border-line bg-white p-4"><div className="mb-2 flex items-center justify-between gap-2"><h2 className="font-semibold">Payments</h2>
+      <section className="mb-4 card p-4"><div className="mb-2 flex items-center justify-between gap-2"><h2 className="font-semibold">Payments</h2>
         {can('payment.take') && o.status !== 'cancelled' && o.balanceMinor > 0 && <Button onClick={() => setPaying(true)}>Take payment</Button>}</div>
         {!o.payments.length && <p className="text-muted">No payments yet.</p>}
         <ul className="divide-y divide-line">{o.payments.map((p: any) => (
@@ -120,13 +120,13 @@ export function OrderDetail() {
               {can('payment.refund.request') && p.refundableMinor > 0 && <Button variant="secondary" className="h-9 px-3 md:h-8" onClick={() => setRefunding(p)}>Refund</Button>}</div></li>))}</ul></section>
 
       {notes.data?.items.length > 0 && (
-        <section className="mb-4 rounded-lg border border-line bg-white p-4" aria-label="Messages to the customer"><h2 className="mb-2 font-semibold">Messages to the customer</h2>
+        <section className="mb-4 card p-4" aria-label="Messages to the customer"><h2 className="mb-2 font-semibold">Messages to the customer</h2>
           <ul className="divide-y divide-line text-sm">{notes.data.items.map((n: any) => (
             <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><div><div>{n.subject}</div><div className="text-xs text-muted">{n.to ?? 'no email address'}{n.error && n.status !== 'sent' ? ` · ${n.error}` : ''}</div></div>
               <Badge tone={n.status === 'sent' ? 'success' : n.status === 'failed' ? 'danger' : n.status === 'queued' || n.status === 'sending' ? 'neutral' : 'warning'}>{n.status === 'logged' ? 'not delivered' : n.status}</Badge></li>))}</ul></section>
       )}
 
-      <section className="mb-4 rounded-lg border border-line bg-white p-4"><h2 className="mb-2 font-semibold">History</h2>
+      <section className="mb-4 card p-4"><h2 className="mb-2 font-semibold">History</h2>
         <ol className="space-y-1 text-sm">{o.events.map((e: any) => <li key={e.id} className="flex flex-wrap gap-x-2"><span className="text-muted">{dateTime(e.occurredAt)}</span><span className="font-medium">{e.type.replace('.', ' ')}</span>{e.note && <span>— {e.note}</span>}</li>)}</ol></section>
 
       {can('order.cancel') && o.status === 'open' && <Button variant="danger" onClick={() => setCancelling(true)}>Cancel order</Button>}

@@ -124,7 +124,7 @@ function Calculator({ services }: { services: any[] }) {
   const sel = services.find((x) => x.id === f.watch('serviceId')) ?? services[0];
   const r = m.data;
   return (
-    <section className="mt-8 max-w-2xl rounded-lg border border-line bg-white p-4" aria-labelledby="calc">
+    <section className="mt-8 max-w-2xl card p-4" aria-labelledby="calc">
       <h2 id="calc" className="mb-3 font-semibold">Price calculator</h2>
       <form className="grid items-end gap-3 sm:grid-cols-4" onSubmit={f.handleSubmit((v) => m.mutate(v))}>
         <Field label="Service">{(id) => <Select id={id} {...f.register('serviceId')}>{services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select>}</Field>

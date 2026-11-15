@@ -26,10 +26,10 @@ export function Refunds() {
       </div>
       <ErrorBanner error={q.error ?? err} />
       {err?.code === 'SHIFT_REQUIRED' && <p className="mb-3 text-sm"><Link className="text-accent underline" to="/till">Open your till</Link> to pay out a cash refund.</p>}
-      {q.isSuccess && !q.data.items.length && <p className="rounded-lg border border-line bg-white p-4 text-muted">Nothing here.</p>}
+      {q.isSuccess && !q.data.items.length && <p className="card p-4 text-muted">Nothing here.</p>}
       <ul className="space-y-2">
         {q.data?.items.map((r: any) => (
-          <li key={r.id} className="rounded-lg border border-line bg-white p-3">
+          <li key={r.id} className="card p-3">
             <div className="flex items-start justify-between gap-2"><div><Link className="font-semibold text-accent-strong hover:underline" to={`/orders/${r.orderId}`}>{r.orderNo}</Link><div className="text-sm text-muted">{r.customerName}</div></div>
               <div className="text-right"><div className="text-lg font-semibold">{fmt(r.amountMinor)}</div><Badge tone={TONE[r.status]}>{METHODS[r.method]}</Badge></div></div>
             <p className="mt-1 text-sm">{r.reason}</p>

@@ -73,7 +73,7 @@ export function POS() {
 
   if (done) return (
     <div className="mx-auto max-w-md space-y-4 text-center" role="status">
-      <div className="rounded-lg border border-line bg-white p-6">
+      <div className="card p-6">
         <p className="text-sm text-muted">Order created</p>
         <p className="text-3xl font-bold tracking-tight">{done.orderNo}</p>
         <p className="mt-2 text-lg">{fmt(done.totalMinor)}{done.paidMinor >= done.totalMinor ? ' · paid' : done.paidMinor > 0 ? ` · ${fmt(done.paidMinor)} paid` : ' · unpaid'}</p>
@@ -81,7 +81,7 @@ export function POS() {
       </div>
       <div className="grid gap-2 sm:grid-cols-3">
         <Button variant="secondary" onClick={() => setReceipt(true)}>Receipt</Button>
-        <Link to={`/orders/${done.id}`} className="inline-flex h-11 items-center justify-center rounded-md border border-line bg-white px-4 text-base font-medium hover:bg-surface md:h-9 md:text-sm">View order</Link>
+        <Link to={`/orders/${done.id}`} className="inline-flex h-11 items-center justify-center card px-4 text-base font-medium hover:bg-surface md:h-9 md:text-sm">View order</Link>
         <Button onClick={reset}>New order</Button>
       </div>
       {receipt && <ReceiptDialog orderId={done.id} onClose={() => setReceipt(false)} />}
@@ -103,7 +103,7 @@ export function POS() {
           <Section title="2. Services">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="list">
               {services.data?.items.map((s: any) => (
-                <button key={s.id} role="listitem" className="min-h-[64px] rounded-lg border border-line bg-white p-3 text-left hover:border-accent active:bg-accent/5"
+                <button key={s.id} role="listitem" className="min-h-[64px] card p-3 text-left hover:border-accent active:bg-accent/5"
                   onClick={() => setLines((ls) => (ls.some((l) => l.serviceId === s.id) ? ls : [...ls, { serviceId: s.id, amount: s.pricingModel === 'per_kg' ? '' : '1' }]))}>
                   <span className="block font-medium">{s.name}</span>
                   <span className="text-xs text-muted">{s.price ? `${fmt(s.price.unitPriceMinor)}${s.pricingModel === 'per_kg' ? '/kg' : s.pricingModel === 'per_item' ? '/item' : ''}` : 'No price'}</span>
@@ -112,7 +112,7 @@ export function POS() {
               {services.isSuccess && !services.data.items.length && <p className="col-span-full text-muted">No services yet. <Link className="text-accent underline" to="/services">Add one</Link>.</p>}
             </div>
             {lines.length > 0 && (
-              <ul className="mt-3 divide-y divide-line rounded-lg border border-line bg-white">
+              <ul className="mt-3 divide-y divide-line card">
                 {lines.map((l, i) => {
                   const s = svc(l.serviceId); const ql = q?.lines?.[i]; const kg = s?.pricingModel === 'per_kg';
                   return (
@@ -218,7 +218,7 @@ export function POS() {
 }
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <section className="space-y-2 rounded-lg border border-line bg-white p-4"><h2 className="font-semibold">{title}</h2>{children}</section>
+  <section className="space-y-2 card p-4"><h2 className="font-semibold">{title}</h2>{children}</section>
 );
 const Choice = ({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) => (
   <button type="button" role="radio" aria-checked={on} onClick={onClick}

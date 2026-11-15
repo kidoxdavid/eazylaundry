@@ -27,7 +27,7 @@ export function Till() {
       <ErrorBanner error={till.error ?? history.error} />
 
       {result && (
-        <section className="mb-4 space-y-2 rounded-lg border border-line bg-white p-4" role="status" aria-label="Till closed">
+        <section className="mb-4 space-y-2 card p-4" role="status" aria-label="Till closed">
           <h2 className="font-semibold">Till closed</h2>
           <dl className="grid grid-cols-2 gap-y-1"><dt>Expected</dt><dd className="text-right">{fmt(result.expectedCashMinor)}</dd><dt>Counted</dt><dd className="text-right">{fmt(result.countedCashMinor)}</dd>
             <dt className="font-semibold">Difference</dt><dd className="text-right">{variance(result.varianceMinor)}</dd></dl>
@@ -37,10 +37,10 @@ export function Till() {
       )}
 
       {till.isSuccess && !s && !result && (
-        <section className="mb-4 space-y-3 rounded-lg border border-line bg-white p-4"><p>You do not have an open till at this branch. Open one to take cash.</p><Button onClick={() => setOpen(true)}>Open till</Button></section>
+        <section className="mb-4 space-y-3 card p-4"><p>You do not have an open till at this branch. Open one to take cash.</p><Button onClick={() => setOpen(true)}>Open till</Button></section>
       )}
       {s && (
-        <section className="mb-4 space-y-3 rounded-lg border border-line bg-white p-4">
+        <section className="mb-4 space-y-3 card p-4">
           <div className="flex items-center justify-between"><h2 className="font-semibold">Open since {dateTime(s.openedAt)}</h2><Badge tone="success">open</Badge></div>
           <dl className="grid grid-cols-2 gap-y-1.5">
             <dt>Starting float</dt><dd className="text-right">{fmt(s.openingFloatMinor)}</dd>
@@ -56,7 +56,7 @@ export function Till() {
         </section>
       )}
 
-      <section className="rounded-lg border border-line bg-white p-4"><h2 className="mb-2 font-semibold">Recent tills</h2>
+      <section className="card p-4"><h2 className="mb-2 font-semibold">Recent tills</h2>
         {!history.data?.items.length && <p className="text-muted">No tills yet.</p>}
         <ul className="divide-y divide-line">{history.data?.items.map((h: any) => (
           <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"><span>{dateTime(h.openedAt)}</span>

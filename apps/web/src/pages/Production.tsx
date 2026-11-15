@@ -38,7 +38,7 @@ export function Production() {
         action={(branches.data?.items.length ?? 0) > 1 ? <div className="w-44"><label className="sr-only" htmlFor="pb">Branch</label>
           <Select id="pb" value={branchId} onChange={(e) => setBranchId(e.target.value)}><option value="">All branches</option>{branches.data.items.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></div> : undefined} />
       <ErrorBanner error={q.error} />
-      {q.isSuccess && total === 0 && <p className="rounded-lg border border-line bg-white p-4 text-muted">Nothing in production. New orders appear here at "Order received".</p>}
+      {q.isSuccess && total === 0 && <p className="card p-4 text-muted">Nothing in production. New orders appear here at "Order received".</p>}
 
       {/* Phones and tablets: stage tabs with counts, one list at a time */}
       <div className="lg:hidden">

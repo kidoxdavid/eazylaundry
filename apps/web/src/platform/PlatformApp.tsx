@@ -38,7 +38,7 @@ export function PlatformApp() {
 }
 
 function Frame({ title, children }: { title: string; children: ReactNode }) {
-  return <div className="flex min-h-full items-center justify-center p-4"><div className="w-full max-w-sm space-y-4 rounded-lg border border-line bg-white p-6"><div><div className="text-sm font-semibold text-accent">EazyLaundry Platform</div><h1 className="text-xl font-semibold">{title}</h1></div>{children}</div></div>;
+  return <div className="flex min-h-full items-center justify-center p-4"><div className="w-full max-w-sm space-y-4 card p-6"><div><div className="text-sm font-semibold text-accent">EazyLaundry Platform</div><h1 className="text-xl font-semibold">{title}</h1></div>{children}</div></div>;
 }
 
 function Login({ onDone }: { onDone: () => unknown }) {
@@ -65,11 +65,11 @@ function Tenants() {
         <label className="sr-only" htmlFor="ts">Status</label><Select id="ts" value={status} onChange={(e) => setStatus(e.target.value)}><option value="">All statuses</option>{['trial', 'active', 'past_due', 'suspended', 'cancelled'].map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}</Select></div>
       <ErrorBanner error={list.error} />
       <ul className="space-y-2">{list.data?.items.map((t: any) => (
-        <li key={t.id}><Link to={`/platform/tenants/${t.id}`} className="block rounded-lg border border-line bg-white p-3 active:bg-surface">
+        <li key={t.id}><Link to={`/platform/tenants/${t.id}`} className="block card p-3 active:bg-surface">
           <div className="flex items-start justify-between gap-2"><div><div className="font-semibold">{t.name}</div><div className="text-xs text-muted">{t.slug}</div></div><Badge tone={TONE[t.status]}>{t.status.replace('_', ' ')}</Badge></div>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted"><span>{t.plan?.name ?? 'no plan'}</span><span>{t.usage.branches} branch(es)</span><span>{t.usage.staffSeats} staff</span><span>{t.usage.ordersThisMonth} orders this month</span>
             {t.status === 'trial' && t.trialEndsAt && <span>trial ends {dateTime(t.trialEndsAt)}</span>}</div></Link></li>))}</ul>
-      {list.isSuccess && !list.data.items.length && <p className="rounded-lg border border-line bg-white p-4 text-muted">No businesses match.</p>}
+      {list.isSuccess && !list.data.items.length && <p className="card p-4 text-muted">No businesses match.</p>}
     </div>
   );
 }
@@ -94,19 +94,19 @@ function TenantDetail({ role }: { role: string }) {
       <div className="flex flex-wrap items-center justify-between gap-2"><div><h1 className="text-xl font-semibold">{t.name}</h1><div className="text-sm text-muted">{t.slug} · since {dateTime(t.createdAt)}</div></div><Badge tone={TONE[t.status]}>{t.status.replace('_', ' ')}</Badge></div>
       <ErrorBanner error={plan.error ?? extend.error ?? rmOverride.error ?? run.error} />
       {t.statusReason && <p className="rounded-md bg-surface p-3 text-sm">Status reason: <b>{t.statusReason.replace('_', ' ')}</b></p>}
-      <section className="grid gap-3 rounded-lg border border-line bg-white p-4 sm:grid-cols-3"><Stat l="Branches" v={t.usage.branches} /><Stat l="Staff" v={t.usage.staffSeats} /><Stat l="Orders this month" v={t.usage.ordersThisMonth} /></section>
+      <section className="grid gap-3 card p-4 sm:grid-cols-3"><Stat l="Branches" v={t.usage.branches} /><Stat l="Staff" v={t.usage.staffSeats} /><Stat l="Orders this month" v={t.usage.ordersThisMonth} /></section>
       <p className="text-xs text-muted">The platform sees usage counts only. Customers, orders and finances belong to the business and are not visible here.</p>
-      <section className="space-y-3 rounded-lg border border-line bg-white p-4"><h2 className="font-semibold">Plan</h2>
+      <section className="space-y-3 card p-4"><h2 className="font-semibold">Plan</h2>
         <div className="flex flex-wrap items-center gap-2"><Select aria-label="Plan" disabled={!write} value={t.plan?.code ?? ''} onChange={(e) => plan.mutate(e.target.value)} className="max-w-xs">{!t.plan && <option value="">No plan</option>}{plans.data?.items.filter((p: any) => p.active).map((p: any) => <option key={p.code} value={p.code}>{p.name}{p.priceMinor ? ` — ${fmt(p.priceMinor)}/mo` : ''}</option>)}</Select></div>
         {t.trialEndsAt && t.status === 'trial' && <p className="text-sm">Trial ends {dateTime(t.trialEndsAt)}</p>}
         {write && <div className="flex flex-wrap gap-2">{['trial', 'suspended'].includes(t.status) && <Button variant="secondary" loading={extend.isPending} onClick={() => extend.mutate(7)}>Extend trial 7 days</Button>}
           <Button variant="secondary" onClick={() => setDlg('status')}>Change status</Button><Button variant="ghost" loading={run.isPending} onClick={() => run.mutate()}>Run lifecycle now</Button></div>}</section>
-      <section className="space-y-2 rounded-lg border border-line bg-white p-4"><div className="flex items-center justify-between"><h2 className="font-semibold">Entitlements</h2>{write && <Button variant="secondary" onClick={() => setDlg('override')}>Add override</Button>}</div>
+      <section className="space-y-2 card p-4"><div className="flex items-center justify-between"><h2 className="font-semibold">Entitlements</h2>{write && <Button variant="secondary" onClick={() => setDlg('override')}>Add override</Button>}</div>
         <ul className="divide-y divide-line text-sm">{Object.entries(t.entitlements).map(([k, v]) => <li key={k} className="flex justify-between py-2"><span>{k}</span><span className="font-medium">{v === null ? 'unlimited' : String(v)}</span></li>)}</ul>
         {t.overrides.length > 0 && <><h3 className="pt-2 text-sm font-semibold">Overrides</h3><ul className="divide-y divide-line text-sm">{t.overrides.map((o: any) => (
           <li key={o.key} className="flex flex-wrap items-center justify-between gap-2 py-2"><div><b>{o.key}</b> = {o.value === null ? 'unlimited' : String(o.value)} {o.expired && <Badge tone="warning">expired</Badge>}<div className="text-xs text-muted">{o.reason}{o.expiresAt ? ` · until ${dateTime(o.expiresAt)}` : ''}</div></div>
             {write && <Button variant="ghost" className="h-9 px-3 md:h-8" onClick={() => rmOverride.mutate(o.key)}>Remove</Button>}</li>))}</ul></>}</section>
-      <section className="rounded-lg border border-line bg-white p-4"><h2 className="mb-2 font-semibold">Recent changes</h2>
+      <section className="card p-4"><h2 className="mb-2 font-semibold">Recent changes</h2>
         <ol className="space-y-1 text-sm">{audit.data?.items.map((a: any) => <li key={a.id}><span className="text-muted">{dateTime(a.at)}</span> <b>{a.action.replace(/[._]/g, ' ')}</b> · {a.actor}</li>)}</ol>{audit.isSuccess && !audit.data.items.length && <p className="text-muted">Nothing yet.</p>}</section>
       {dlg === 'status' && <StatusDialog id={id!} current={t.status} onClose={() => setDlg(null)} onDone={refresh} />}
       {dlg === 'override' && <OverrideDialog id={id!} onClose={() => setDlg(null)} onDone={refresh} />}
@@ -151,7 +151,7 @@ function Plans({ role }: { role: string }) {
       <p className="text-sm text-muted">Starting pricing hypotheses — not validated market prices. Changes apply to creation checks immediately; existing data is never removed.</p>
       <ErrorBanner error={q.error} />
       <ul className="space-y-2">{q.data?.items.map((p: any) => (
-        <li key={p.id} className="rounded-lg border border-line bg-white p-3"><div className="flex items-start justify-between gap-2"><div className="font-semibold">{p.name} {!p.active && <Badge tone="warning">inactive</Badge>}</div>
+        <li key={p.id} className="card p-3"><div className="flex items-start justify-between gap-2"><div className="font-semibold">{p.name} {!p.active && <Badge tone="warning">inactive</Badge>}</div>
           <div className="text-right font-semibold">{p.priceMinor === null ? 'Custom' : `${fmt(p.priceMinor)}/${p.interval}`}</div></div>
           <div className="mt-1 flex flex-wrap gap-1">{Object.entries(p.entitlements).map(([k, v]) => <Badge key={k}>{k.replace(/^(limit|module|feature)\./, '')}: {v === null ? '∞' : String(v)}</Badge>)}</div>
           {role === 'platform_admin' && <div className="mt-2"><Button variant="secondary" className="h-9 px-3 md:h-8" onClick={() => setEditing(p)}>Edit price</Button></div>}</li>))}</ul>
@@ -171,7 +171,7 @@ function Audit() {
   const q = useQuery({ queryKey: ['p-audit-all'], queryFn: () => platformApi.get('/platform/audit?limit=100') });
   return (
     <div className="space-y-3"><h1 className="text-xl font-semibold">Audit log</h1><ErrorBanner error={q.error} />
-      <ul className="divide-y divide-line rounded-lg border border-line bg-white text-sm">{q.data?.items.map((a: any) => <li key={a.id} className="p-3"><div className="flex flex-wrap justify-between gap-2"><b>{a.action.replace(/[._]/g, ' ')}</b><span className="text-muted">{dateTime(a.at)}</span></div>
+      <ul className="divide-y divide-line card text-sm">{q.data?.items.map((a: any) => <li key={a.id} className="p-3"><div className="flex flex-wrap justify-between gap-2"><b>{a.action.replace(/[._]/g, ' ')}</b><span className="text-muted">{dateTime(a.at)}</span></div>
         <div className="text-muted">{a.actor}{a.tenantId ? <> · <Link className="text-accent underline" to={`/platform/tenants/${a.tenantId}`}>business</Link></> : ''}</div><div className="truncate text-xs text-muted" title={JSON.stringify(a.detail)}>{JSON.stringify(a.detail)}</div></li>)}</ul></div>
   );
 }

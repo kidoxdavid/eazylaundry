@@ -40,9 +40,9 @@ export function OrdersPage() {
         <section className="rounded-xl border border-accent/30 bg-white p-4"><h2 className="mb-2 font-semibold">Upcoming pickups</h2>
           <ul className="space-y-2">{upcoming.map((x: any) => <li key={x.id} className="flex flex-wrap items-center justify-between gap-2 text-sm"><span>{new Date(x.windowStart).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' })} · {hhmm(x.windowStart)}–{hhmm(x.windowEnd)}</span><Badge tone={TONE[x.status]}>{STATUS_TEXT[x.status]}</Badge></li>)}</ul></section>
       )}
-      {q.isSuccess && !q.data.items.length && <p className="rounded-xl bg-white p-6 text-center text-muted">No orders yet. <Link className="text-accent underline" to={`/b/${slug}/bookings`}>Book a pickup</Link> to get started.</p>}
+      {q.isSuccess && !q.data.items.length && <p className="card p-6 text-center text-muted">No orders yet. <Link className="text-accent underline" to={`/b/${slug}/bookings`}>Book a pickup</Link> to get started.</p>}
       <ul className="space-y-3">{q.data?.items.map((o: any) => (
-        <li key={o.id}><Link to={`/b/${slug}/orders/${o.id}`} className="block space-y-3 rounded-xl bg-white p-4 shadow-sm active:bg-surface">
+        <li key={o.id}><Link to={`/b/${slug}/orders/${o.id}`} className="block space-y-3 card p-4 shadow-sm active:bg-surface">
           <div className="flex items-start justify-between gap-2"><div><div className="font-semibold">{o.orderNo}</div><div className="text-sm text-muted">{dateTime(o.createdAt)}</div></div><div className="text-right font-semibold">{fmt(o.totalMinor)}{o.balanceMinor > 0 && o.progress.step !== 'cancelled' && <div className="text-xs font-normal text-warning">{fmt(o.balanceMinor)} due</div>}</div></div>
           <ProgressBar step={o.progress.step} />
         </Link></li>))}</ul>
@@ -61,16 +61,16 @@ export function OrderDetailPage() {
     <div className="space-y-4">
       <p className="text-sm"><Link className="text-accent underline" to={`/b/${slug}/orders`}>← My orders</Link></p>
       <h1 className="text-xl font-semibold">Order {o.receipt.orderNo}</h1>
-      <section className="space-y-3 rounded-xl bg-white p-4"><ProgressBar step={o.progress.step} />
+      <section className="space-y-3 card p-4"><ProgressBar step={o.progress.step} />
         {o.progress.step !== 'completed' && o.progress.step !== 'cancelled' && <p className="text-sm text-muted">Expected ready by {o.receipt.promisedLocal}</p>}</section>
       {d && (
-        <section className="space-y-2 rounded-xl bg-white p-4" aria-labelledby="dlv"><div className="flex items-center justify-between"><h2 id="dlv" className="font-semibold">Delivery</h2><Badge tone={TONE[d.status]}>{STATUS_TEXT[d.status] ?? d.status}</Badge></div>
+        <section className="space-y-2 card p-4" aria-labelledby="dlv"><div className="flex items-center justify-between"><h2 id="dlv" className="font-semibold">Delivery</h2><Badge tone={TONE[d.status]}>{STATUS_TEXT[d.status] ?? d.status}</Badge></div>
           <p className="text-sm">{new Date(d.windowStart).toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' })}, {hhmm(d.windowStart)}–{hhmm(d.windowEnd)} · {d.city}</p>
           {d.code && <div className="rounded-lg bg-accent/10 p-4 text-center"><div className="text-sm">Give this code to your driver</div><div className="font-mono text-4xl font-bold tracking-widest text-accent-strong" aria-label={`Delivery code ${d.code.split('').join(' ')}`}>{d.code}</div><div className="mt-1 text-xs text-muted">Do not share it with anyone else.</div></div>}</section>
       )}
-      <section className="rounded-xl bg-white p-4"><h2 className="mb-2 font-semibold">Updates</h2>
+      <section className="card p-4"><h2 className="mb-2 font-semibold">Updates</h2>
         <ol className="space-y-2 text-sm">{o.timeline.map((t: any, i: number) => <li key={i} className="flex justify-between gap-2"><span className="font-medium">{t.label}</span><span className="text-muted">{dateTime(t.at)}</span></li>)}</ol></section>
-      <section className="rounded-xl bg-white p-2"><Receipt r={o.receipt} /></section>
+      <section className="card p-2"><Receipt r={o.receipt} /></section>
     </div>
   );
 }
@@ -90,9 +90,9 @@ export function BookPickup() {
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Book a pickup</h1>
       {me.isSuccess && !addresses.length ? (
-        <div className="rounded-xl bg-white p-4"><p className="mb-2">Add the address we should collect from.</p><AddressForm onSaved={() => me.refetch()} /></div>
+        <div className="card p-4"><p className="mb-2">Add the address we should collect from.</p><AddressForm onSaved={() => me.refetch()} /></div>
       ) : (
-        <form className="space-y-3 rounded-xl bg-white p-4" onSubmit={(e) => { e.preventDefault(); book.mutate(); }}>
+        <form className="space-y-3 card p-4" onSubmit={(e) => { e.preventDefault(); book.mutate(); }}>
           <ErrorBanner error={book.error} />
           {book.isSuccess && <p role="status" className="rounded-md bg-green-50 p-3 text-success">Pickup booked. We have emailed you a confirmation.</p>}
           <Field label="Pickup address">{(id) => <Select id={id} value={addressId || addresses[0]?.id || ''} onChange={(e) => setAddressId(e.target.value)}>{addresses.map((a: any) => <option key={a.id} value={a.id}>{a.label}: {addrLine(a)}</option>)}</Select>}</Field>
@@ -102,7 +102,7 @@ export function BookPickup() {
           <Button type="submit" className="w-full" loading={book.isPending}>Book pickup</Button>
         </form>
       )}
-      <section className="rounded-xl bg-white p-4"><h2 className="mb-2 font-semibold">Your bookings</h2>
+      <section className="card p-4"><h2 className="mb-2 font-semibold">Your bookings</h2>
         {!list.data?.items.length && <p className="text-muted">Nothing booked yet.</p>}
         <ul className="divide-y divide-line">{list.data?.items.map((x: any) => (
           <li key={x.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"><div><div className="font-medium">{dateTime(x.windowStart)} – {hhmm(x.windowEnd)}</div><div className="text-muted">{addrLine(x.address)}</div></div>
@@ -140,11 +140,11 @@ export function Account() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Your account</h1>
-      <form className="space-y-3 rounded-xl bg-white p-4" onSubmit={f.handleSubmit((v) => save.mutate(v))}><h2 className="font-semibold">Details</h2><ErrorBanner error={save.error} />
+      <form className="space-y-3 card p-4" onSubmit={f.handleSubmit((v) => save.mutate(v))}><h2 className="font-semibold">Details</h2><ErrorBanner error={save.error} />
         <p className="text-sm text-muted">{me.data?.customer.email}</p>
         <Field label="Name">{(id) => <Input id={id} required {...f.register('fullName')} />}</Field><Field label="Phone">{(id) => <Input id={id} type="tel" {...f.register('phone')} />}</Field>
         <Button type="submit" loading={save.isPending}>Save</Button>{save.isSuccess && <span role="status" className="ml-2 text-sm text-success">Saved</span>}</form>
-      <section className="space-y-2 rounded-xl bg-white p-4"><div className="flex items-center justify-between"><h2 className="font-semibold">Addresses</h2><Button variant="secondary" onClick={() => setAdding((a) => !a)}>{adding ? 'Close' : 'Add address'}</Button></div>
+      <section className="space-y-2 card p-4"><div className="flex items-center justify-between"><h2 className="font-semibold">Addresses</h2><Button variant="secondary" onClick={() => setAdding((a) => !a)}>{adding ? 'Close' : 'Add address'}</Button></div>
         <ErrorBanner error={del.error} />
         <ul className="divide-y divide-line">{me.data?.addresses.map((a: any) => <li key={a.id} className="flex items-start justify-between gap-2 py-2 text-sm"><div><div className="font-medium">{a.label} {a.isDefault && <Badge tone="success">default</Badge>}</div><div className="text-muted">{addrLine(a)}</div></div><Button variant="ghost" className="h-9 px-3 md:h-8" onClick={() => del.mutate(a.id)}>Remove</Button></li>)}</ul>
         {adding && <AddressForm onSaved={async () => { await me.refetch(); setAdding(false); }} />}</section>

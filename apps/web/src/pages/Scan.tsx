@@ -60,7 +60,7 @@ export function Scan() {
       {camera && <CameraScanner onClose={() => setCamera(false)} onCode={(c) => { setCamera(false); lookup.mutate(c); }} />}
 
       {card && (
-        <section className="space-y-3 rounded-lg border border-line bg-white p-4" aria-live="polite">
+        <section className="space-y-3 card p-4" aria-live="polite">
           <div className="flex items-start justify-between gap-2">
             <div><div className="text-2xl font-bold tracking-tight">{card.orderNo}</div><div className="text-muted">{card.customerName}</div></div>
             <Link className="text-sm text-accent underline" to={`/orders/${card.id}`}>Open order</Link>

@@ -21,7 +21,7 @@ export function Driver() {
     <div className="mx-auto max-w-xl">
       <PageHeader title="My deliveries" subtitle={`${active.length} to do today`} action={<Button variant="secondary" onClick={() => refresh()}>Refresh</Button>} />
       <ErrorBanner error={q.error ?? start.error} />
-      {q.isSuccess && !items.length && <p className="rounded-lg border border-line bg-white p-4 text-muted">Nothing assigned to you right now.</p>}
+      {q.isSuccess && !items.length && <p className="card p-4 text-muted">Nothing assigned to you right now.</p>}
       <ul className="space-y-3">
         {active.map((t) => (
           <li key={t.id} className="space-y-3 rounded-xl border border-line bg-white p-4">
@@ -32,8 +32,8 @@ export function Driver() {
             {t.orderNo && <p className="text-sm text-muted">Order {t.orderNo}</p>}
             {t.blockedReason && <p role="status" className="rounded-md bg-red-50 p-2 text-sm text-danger">{t.blockedReason}</p>}
             <div className="grid grid-cols-2 gap-2">
-              <a href={t.mapsUrl} target="_blank" rel="noreferrer" className="flex h-12 items-center justify-center rounded-md border border-line bg-white font-medium hover:bg-surface">Navigate</a>
-              {t.contactPhone ? <a href={`tel:${t.contactPhone}`} className="flex h-12 items-center justify-center rounded-md border border-line bg-white font-medium hover:bg-surface">Call</a> : <span />}
+              <a href={t.mapsUrl} target="_blank" rel="noreferrer" className="flex h-12 items-center justify-center card font-medium hover:bg-surface">Navigate</a>
+              {t.contactPhone ? <a href={`tel:${t.contactPhone}`} className="flex h-12 items-center justify-center card font-medium hover:bg-surface">Call</a> : <span />}
             </div>
             {t.status === 'assigned'
               ? <Button className="h-14 w-full text-lg" loading={start.isPending} onClick={() => start.mutate(t.id)}>Start</Button>
@@ -44,7 +44,7 @@ export function Driver() {
       </ul>
       {done.length > 0 && (
         <section className="mt-6"><h2 className="mb-2 font-semibold">Done today</h2>
-          <ul className="space-y-2">{done.map((t) => <li key={t.id} className="flex items-center justify-between rounded-lg border border-line bg-white p-3 text-sm"><span>{t.kind === 'pickup' ? 'Pickup' : 'Delivery'} · {t.contactName}</span>
+          <ul className="space-y-2">{done.map((t) => <li key={t.id} className="flex items-center justify-between card p-3 text-sm"><span>{t.kind === 'pickup' ? 'Pickup' : 'Delivery'} · {t.contactName}</span>
             <Badge tone={t.status === 'completed' ? 'success' : 'danger'}>{t.status === 'failed' ? `failed: ${(t.failureReason ?? '').replace('_', ' ')}` : t.status}</Badge></li>)}</ul></section>
       )}
       {completing && <CompleteDialog task={completing} onClose={() => setCompleting(null)} onDone={refresh} />}

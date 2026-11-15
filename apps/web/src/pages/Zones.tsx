@@ -15,10 +15,10 @@ export function Zones() {
       <PageHeader title="Delivery zones" subtitle="Where you pick up and deliver, and what it costs. Zones match by postal code prefix."
         action={manage ? <Button onClick={() => setEditing('new')}>Add zone</Button> : undefined} />
       <ErrorBanner error={q.error} />
-      {q.isSuccess && !q.data.items.length && <p className="rounded-lg border border-line bg-white p-4 text-muted">No zones yet. Add a zone to offer pickup and delivery.</p>}
+      {q.isSuccess && !q.data.items.length && <p className="card p-4 text-muted">No zones yet. Add a zone to offer pickup and delivery.</p>}
       <ul className="space-y-2">
         {q.data?.items.map((z: any) => (
-          <li key={z.id} className="rounded-lg border border-line bg-white p-3">
+          <li key={z.id} className="card p-3">
             <div className="flex items-start justify-between gap-2"><div className="font-semibold">{z.name} {!z.active && <Badge tone="warning">inactive</Badge>}</div>
               {manage && <Button variant="ghost" className="h-9 px-3 md:h-8" onClick={() => setEditing(z)}>Edit</Button>}</div>
             <div className="mt-1 flex flex-wrap gap-1">{z.postalPrefixes.map((p: string) => <Badge key={p}>{p}</Badge>)}</div>

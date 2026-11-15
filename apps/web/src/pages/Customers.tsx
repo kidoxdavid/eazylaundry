@@ -81,11 +81,11 @@ export function CustomerDetail() {
       <ErrorBanner error={consent.error ?? rmAddr.error ?? archive.error} />
       {c.archived && <p className="mb-4"><Badge tone="warning">Archived</Badge></p>}
       <div className="grid max-w-4xl gap-6 md:grid-cols-2">
-        <section className="space-y-2 rounded-lg border border-line bg-white p-4">
+        <section className="space-y-2 card p-4">
           <h2 className="font-semibold">Contact &amp; notes</h2>
           {manage ? <EditNotes customer={c} onSaved={refresh} /> : <p className="text-muted">{c.notes ?? 'No notes'}</p>}
         </section>
-        <section className="space-y-2 rounded-lg border border-line bg-white p-4">
+        <section className="space-y-2 card p-4">
           <h2 className="font-semibold">Communication consent</h2>
           {PURPOSES.map(([p, label]) => (
             <label key={p} className="flex items-center justify-between gap-2 text-sm">{label}
@@ -95,7 +95,7 @@ export function CustomerDetail() {
           ))}
           <p className="text-xs text-muted">Every change is recorded with its source and time.</p>
         </section>
-        <section className="space-y-2 rounded-lg border border-line bg-white p-4 md:col-span-2">
+        <section className="space-y-2 card p-4 md:col-span-2">
           <div className="flex items-center justify-between"><h2 className="font-semibold">Addresses</h2>
             {manage && <Button variant="secondary" onClick={() => setAddAddr(true)}>Add address</Button>}</div>
           {!c.addresses.length && <p className="text-muted">No addresses yet.</p>}
@@ -130,7 +130,7 @@ function EditNotes({ customer, onSaved }: { customer: any; onSaved: () => unknow
       <Field label="Phone">{(id) => <Input id={id} type="tel" {...f.register('phone')} />}</Field>
       <Field label="Email">{(id) => <Input id={id} type="email" {...f.register('email')} />}</Field>
       <Field label="Notes (e.g. fragrance-free, starch preferences)">{(id) => (
-        <textarea id={id} rows={3} className="w-full rounded-md border border-line bg-white p-2 text-sm" {...f.register('notes')} />)}</Field>
+        <textarea id={id} rows={3} className="w-full card p-2 text-sm" {...f.register('notes')} />)}</Field>
       <Button type="submit" loading={m.isPending}>Save changes</Button>
     </form>
   );

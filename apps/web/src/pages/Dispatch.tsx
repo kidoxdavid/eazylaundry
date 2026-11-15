@@ -25,10 +25,10 @@ export function Dispatch() {
           <button key={k} role="tab" aria-selected={range === k} onClick={() => setRange(k)} className={`min-h-[44px] rounded-full border px-4 text-sm font-medium ${range === k ? 'border-accent bg-accent text-white' : 'border-line bg-white'}`}>{l}</button>))}
       </div>
       <ErrorBanner error={q.error} />
-      {q.isSuccess && !items.length && <p className="rounded-lg border border-line bg-white p-4 text-muted">Nothing scheduled.</p>}
+      {q.isSuccess && !items.length && <p className="card p-4 text-muted">Nothing scheduled.</p>}
       <ul className="space-y-2">
         {items.map((t) => (
-          <li key={t.id}><button className="block w-full rounded-lg border border-line bg-white p-3 text-left active:bg-surface" onClick={() => setOpen(t.id)}>
+          <li key={t.id}><button className="block w-full card p-3 text-left active:bg-surface" onClick={() => setOpen(t.id)}>
             <div className="flex items-start justify-between gap-2"><div className="font-semibold">{t.kind === 'pickup' ? 'Pickup' : 'Delivery'} · {t.customerName}</div><Badge tone={TONE[t.status]}>{t.status.replace('_', ' ')}</Badge></div>
             <div className="text-sm text-muted">{addr(t.address)}</div>
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm"><span>{new Date(t.windowStart).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })} {hhmm(t.windowStart)}–{hhmm(t.windowEnd)}</span>
