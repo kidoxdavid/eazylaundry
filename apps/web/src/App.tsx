@@ -15,6 +15,7 @@ import { Driver } from './pages/Driver';
 import { Overview } from './pages/Overview';
 import { POS } from './pages/POS';
 import { Production } from './pages/Production';
+import { Reports } from './pages/Reports';
 import { Refunds } from './pages/Refunds';
 import { Scan } from './pages/Scan';
 import { Till } from './pages/Till';
@@ -60,6 +61,7 @@ function Shell() {
     { to: '/production', label: 'Production', show: can('order.read') },
     { to: '/till', label: 'Till', show: can('cash.shift.manage') },
     { to: '/refunds', label: 'Refunds', show: can('payment.refund.request') },
+    { to: '/reports', label: 'Reports', show: can('report.read') || can('finance.read') },
     { to: '/customers', label: 'Customers', show: can('customer.read') },
     { to: '/services', label: 'Services', show: can('order.read') },
     { to: '/branches', label: 'Branches', show: can('branch.read') },
@@ -143,6 +145,7 @@ export function App() {
         <Route path="team" element={<Team />} />
         <Route path="roles" element={<Roles />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="reports" element={<Reports />} />
         <Route path="billing" element={<Billing />} />
         <Route path="audit" element={<Audit />} />
       </Route>
