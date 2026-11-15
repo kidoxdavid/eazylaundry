@@ -27,6 +27,8 @@ import { CatalogueController } from './catalogue/catalogue.controller.js';
 import { OrdersController } from './orders/orders.controller.js';
 import { ProductionController } from './production/production.controller.js';
 import { WorkflowService } from './production/workflow.service.js';
+import { CashController } from './cash/cash.controller.js';
+import { RefundsController } from './cash/refunds.controller.js';
 import { PricingController } from './pricing/pricing.controller.js';
 import { PricingService } from './pricing/pricing.service.js';
 import { CustomersController } from './customers/customers.controller.js';
@@ -40,7 +42,7 @@ export function buildAppModule(cfg: AppConfig) {
       { name: 'default', ttl: 60_000, limit: cfg.throttleLimit },
       { name: 'auth', ttl: 60_000, limit: cfg.authThrottleLimit, skipIf: (ctx) => !Reflect.getMetadata(AUTH_THROTTLE_KEY, ctx.getHandler()) },
     ])],
-    controllers: [HealthController, AuthController, BranchesController, RolesController, MembersController, ConfigController, AuditController, CustomersController, CatalogueController, PricingController, OrdersController, ProductionController],
+    controllers: [HealthController, AuthController, BranchesController, RolesController, MembersController, ConfigController, AuditController, CustomersController, CatalogueController, PricingController, OrdersController, ProductionController, CashController, RefundsController],
     providers: [
       { provide: APP_CONFIG, useValue: cfg },
       { provide: FIELD_CIPHER, useValue: new FieldCipher(cfg.encryptionSecret) },

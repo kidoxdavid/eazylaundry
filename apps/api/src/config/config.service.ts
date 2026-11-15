@@ -6,6 +6,8 @@ import type { Tx } from '@eazy/database';
 export const CONFIG_REGISTRY = {
   'tax.price_mode': { schema: z.enum(['exclusive', 'inclusive']), default: 'exclusive' },
   'tax.rounding_level': { schema: z.enum(['line', 'order']), default: 'line' },
+  /** When true, cash can only be taken into an open till (shift). Safer default for staffed counters. */
+  'cash.require_shift': { schema: z.boolean(), default: true },
   'weight.display_unit': { schema: z.enum(['kg', 'lb']), default: 'kg' },
 } as const;
 export type ConfigKey = keyof typeof CONFIG_REGISTRY;

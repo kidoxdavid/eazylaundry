@@ -80,3 +80,10 @@ export async function ownerQuery<T = any>(sql: string, params: unknown[] = []) {
   try { return (await c.query(sql, params)).rows as T[]; } finally { await c.end(); }
 }
 export { APP_URL, OWNER_URL };
+
+/** POST with an Idempotency-Key header (the cookie-jar client does not set one). */
+export async function postKey(c: Client, url: string, body: unknown, k: string = `k-${crypto.randomUUID()}`) {
+  const supertest = (await import('supertest')).default;
+  return supertest(c.app.getHttpServer()).post(url).set('Cookie', Object.entries(c.cookies).map(([a, b]) => `${a}=${b}`).join('; '))
+    .set('x-csrf-token', c.cookies.eazy_csrf).set('Idempotency-Key', k).send(body as object);
+}

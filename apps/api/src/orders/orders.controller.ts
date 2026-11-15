@@ -11,6 +11,7 @@ import { uuidv7 } from '../common/ids.js';
 import type { Actor } from '../common/types.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { DATABASE } from '../db/db.module.js';
+import { ConfigService } from '../config/config.service.js';
 import { quoteSchema } from '../pricing/pricing.controller.js';
 import { WorkflowService, newScanToken } from '../production/workflow.service.js';
 import { PricingService } from '../pricing/pricing.service.js';
@@ -64,7 +65,8 @@ export async function loadOrder(tx: Tx, id: string) {
 @Controller('orders')
 export class OrdersController {
   constructor(@Inject(DATABASE) private readonly db: Database, @Inject(AuditService) private readonly audit: AuditService,
-              @Inject(PricingService) private readonly pricing: PricingService, @Inject(WorkflowService) private readonly workflow: WorkflowService) {}
+              @Inject(PricingService) private readonly pricing: PricingService, @Inject(WorkflowService) private readonly workflow: WorkflowService,
+              @Inject(ConfigService) private readonly cfg: ConfigService) {}
 
   private async event(tx: Tx, a: Actor, order: { id: string; branch_id: string }, type: string, payload: Record<string, unknown> = {}, note?: string) {
     await tx.query(`INSERT INTO order_events (id, tenant_id, branch_id, order_id, type, actor_user_id, note, payload) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
@@ -87,10 +89,18 @@ export class OrdersController {
     } else if (p.tenderedMinor !== undefined) {
       throw new AppError(422, 'TENDERED_NOT_APPLICABLE', 'Tendered amount only applies to cash');
     }
+    // Cash goes into the receiving user's open till at this branch. Whether a till is mandatory is a business setting.
+    let shiftId: string | null = null;
+    if (p.method === 'cash') {
+      shiftId = (await tx.query(`SELECT id FROM cash_shifts WHERE branch_id = $1 AND opened_by = $2 AND status = 'open'`, [o.branch_id, a.userId])).rows[0]?.id ?? null;
+      if (!shiftId && (await this.cfg.resolve(tx, a.tenantId!, 'cash.require_shift', o.branch_id)).value) {
+        throw conflict('SHIFT_REQUIRED', 'Open your till before taking cash');
+      }
+    }
     const paymentId = uuidv7();
-    await tx.query(`INSERT INTO payments (id, tenant_id, branch_id, method, amount_minor, tendered_minor, change_minor, currency, reference, received_by)
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [paymentId, a.tenantId, o.branch_id, p.method, p.amountMinor, tendered, change, o.currency, p.reference ?? null, a.userId]);
+    await tx.query(`INSERT INTO payments (id, tenant_id, branch_id, method, amount_minor, tendered_minor, change_minor, currency, reference, received_by, shift_id)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [paymentId, a.tenantId, o.branch_id, p.method, p.amountMinor, tendered, change, o.currency, p.reference ?? null, a.userId, shiftId]);
     await tx.query(`INSERT INTO payment_allocations (id, tenant_id, branch_id, payment_id, order_id, amount_minor) VALUES ($1,$2,$3,$4,$5,$6)`,
       [uuidv7(), a.tenantId, o.branch_id, paymentId, orderId, p.amountMinor]);
     await tx.query(`UPDATE orders SET paid_minor = paid_minor + $2, version = version + 1, updated_at = now() WHERE id = $1`, [orderId, p.amountMinor]);
@@ -193,7 +203,11 @@ export class OrdersController {
       const lines = await tx.query(`SELECT * FROM order_lines WHERE order_id = $1 ORDER BY line_no`, [id]);
       const pays = await tx.query(`SELECT p.* FROM payments p JOIN payment_allocations pa ON pa.tenant_id = p.tenant_id AND pa.payment_id = p.id WHERE pa.order_id = $1 ORDER BY p.received_at`, [id]);
       const events = await tx.query(`SELECT id, type, actor_user_id, note, payload, occurred_at FROM order_events WHERE order_id = $1 ORDER BY occurred_at, id`, [id]);
-      return { ...mapOrder(o), lines: lines.rows.map(mapLine), payments: pays.rows.map(mapPayment),
+      const refunds = (await tx.query(`SELECT id, payment_id, method, amount_minor, reference, refunded_at FROM refunds WHERE order_id = $1 ORDER BY refunded_at`, [id])).rows;
+      const refundedFor = (pid: string) => refunds.filter((r) => r.payment_id === pid).reduce((n, r) => n + N(r.amount_minor), 0);
+      return { ...mapOrder(o), lines: lines.rows.map(mapLine),
+        payments: pays.rows.map((p) => ({ ...mapPayment(p), refundedMinor: refundedFor(p.id), refundableMinor: N(p.amount_minor) - refundedFor(p.id) })),
+        refunds: refunds.map((r) => ({ id: r.id, paymentId: r.payment_id, method: r.method, amountMinor: N(r.amount_minor), reference: r.reference, refundedAt: r.refunded_at })),
         events: events.rows.map((e) => ({ id: e.id, type: e.type, actorUserId: e.actor_user_id, note: e.note, payload: e.payload, occurredAt: e.occurred_at })) };
     });
   }

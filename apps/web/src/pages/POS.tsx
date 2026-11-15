@@ -6,6 +6,7 @@ import { useAuth } from '../auth';
 import { ReceiptDialog } from '../components/Receipt';
 import { Button, ErrorBanner, Field, Input, Select } from '../components/ui';
 import { METHODS, fmt, newKey, toMinor } from '../format';
+import { OpenTillDialog, useTill } from '../components/Till';
 import { NewCustomer } from './Customers';
 
 interface Line { serviceId: string; amount: string }
@@ -28,6 +29,7 @@ export function POS() {
   const [done, setDone] = useState<any>(null);
   const [receipt, setReceipt] = useState(false);
   const keyRef = useRef(newKey());
+  const till = useTill(branchId); const [openTill, setOpenTill] = useState(false);
 
   useEffect(() => { if (!branchId && branches.data?.items.length) setBranchId(branches.data.items.find((b: any) => b.status === 'active')?.id ?? ''); }, [branches.data, branchId]);
   const svc = (id: string) => services.data?.items.find((s: any) => s.id === id);
@@ -50,6 +52,7 @@ export function POS() {
 
   const amountMinor = toMinor(amount || '0'); const tenderedMinor = tendered ? toMinor(tendered) : amountMinor;
   const change = method === 'cash' ? Math.max(0, tenderedMinor - amountMinor) : 0;
+  const needTill = payNow && method === 'cash' && till.isSuccess && !till.data && can('cash.shift.manage');
   const payInvalid = payNow && (amountMinor <= 0 || amountMinor > total || (method === 'cash' && tenderedMinor < amountMinor));
 
   const submit = useMutation({
@@ -161,6 +164,7 @@ export function POS() {
                   <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Payment method">
                     {Object.entries(METHODS).map(([k, label]) => <Choice key={k} on={method === k} onClick={() => setMethod(k)}>{label}</Choice>)}
                   </div>
+                  {needTill && <div role="alert" className="rounded-md bg-amber-50 p-3 text-sm text-warning">Open your till before taking cash. <button type="button" className="font-semibold underline" onClick={() => setOpenTill(true)}>Open till</button></div>}
                   <Field label="Amount ($)">{(id) => <Input id={id} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} />}</Field>
                   {method === 'cash' && (
                     <>
@@ -178,10 +182,11 @@ export function POS() {
         </aside>
       </div>
 
+      {openTill && <OpenTillDialog branchId={branchId} onClose={() => setOpenTill(false)} />}
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white p-3 lg:static lg:mt-4 lg:border-0 lg:bg-transparent lg:p-0">
         <div className="mx-auto flex max-w-5xl items-center gap-3">
           <div className="min-w-[90px] lg:hidden"><div className="text-xs text-muted">Total</div><div className="text-xl font-bold">{q ? fmt(q.totalMinor) : '—'}</div></div>
-          <Button className="flex-1 lg:flex-none lg:px-8" loading={submit.isPending} disabled={!customer || !valid || !q || quote.isError || payInvalid || (quote.isFetching && !q)} onClick={() => submit.mutate()}>
+          <Button className="flex-1 lg:flex-none lg:px-8" loading={submit.isPending} disabled={!customer || !valid || !q || quote.isError || payInvalid || needTill || (quote.isFetching && !q)} onClick={() => submit.mutate()}>
             {!customer ? 'Choose a customer' : payNow ? `Charge ${amountMinor > 0 ? fmt(amountMinor) : ''}`.trim() : 'Create order (unpaid)'}
           </Button>
         </div>

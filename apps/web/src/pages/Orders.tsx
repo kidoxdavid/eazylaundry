@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { get, post } from '../api';
+import { ApiError, get, post } from '../api';
 import { useAuth } from '../auth';
 import { LabelsDialog } from '../components/Labels';
 import { OrderActions, OrderBadges, StageTracker } from '../components/OrderActions';
@@ -63,6 +63,7 @@ export function OrderDetail() {
   const { id } = useParams(); const { can } = useAuth(); const qc = useQueryClient();
   const q = useQuery({ queryKey: ['order', id], queryFn: () => get(`/orders/${id}`) });
   const prod = useQuery({ queryKey: ['production', id], queryFn: () => get(`/orders/${id}/production`) });
+  const [refunding, setRefunding] = useState<any>(null);
   const [receipt, setReceipt] = useState(false); const [paying, setPaying] = useState(false); const [cancelling, setCancelling] = useState(false); const [labels, setLabels] = useState(false);
   const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: ['order', id] }), qc.invalidateQueries({ queryKey: ['production', id] }), qc.invalidateQueries({ queryKey: ['orders'] }), qc.invalidateQueries({ queryKey: ['board'] })]);
   const o = q.data;
@@ -106,8 +107,10 @@ export function OrderDetail() {
         {can('payment.take') && o.status !== 'cancelled' && o.balanceMinor > 0 && <Button onClick={() => setPaying(true)}>Take payment</Button>}</div>
         {!o.payments.length && <p className="text-muted">No payments yet.</p>}
         <ul className="divide-y divide-line">{o.payments.map((p: any) => (
-          <li key={p.id} className="flex justify-between gap-3 py-2"><div><div className="font-medium">{METHODS[p.method]}{p.reference ? ` · ${p.reference}` : ''}</div>
-            <div className="text-sm text-muted">{dateTime(p.receivedAt)}{p.changeMinor ? ` · change ${fmt(p.changeMinor)}` : ''}</div></div><div className="font-medium">{fmt(p.amountMinor)}</div></li>))}</ul></section>
+          <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><div><div className="font-medium">{METHODS[p.method]}{p.reference ? ` · ${p.reference}` : ''}</div>
+            <div className="text-sm text-muted">{dateTime(p.receivedAt)}{p.changeMinor ? ` · change ${fmt(p.changeMinor)}` : ''}{p.refundedMinor ? ` · refunded ${fmt(p.refundedMinor)}` : ''}</div></div>
+            <div className="flex items-center gap-2"><span className="font-medium">{fmt(p.amountMinor)}</span>
+              {can('payment.refund.request') && p.refundableMinor > 0 && <Button variant="secondary" className="h-9 px-3 md:h-8" onClick={() => setRefunding(p)}>Refund</Button>}</div></li>))}</ul></section>
 
       <section className="mb-4 rounded-lg border border-line bg-white p-4"><h2 className="mb-2 font-semibold">History</h2>
         <ol className="space-y-1 text-sm">{o.events.map((e: any) => <li key={e.id} className="flex flex-wrap gap-x-2"><span className="text-muted">{dateTime(e.occurredAt)}</span><span className="font-medium">{e.type.replace('.', ' ')}</span>{e.note && <span>— {e.note}</span>}</li>)}</ol></section>
@@ -116,6 +119,7 @@ export function OrderDetail() {
       {receipt && <ReceiptDialog orderId={o.id} onClose={() => setReceipt(false)} />}
       {labels && <LabelsDialog orderId={o.id} onClose={() => setLabels(false)} />}
       {paying && <PayDialog order={o} onClose={() => setPaying(false)} onDone={refresh} />}
+      {refunding && <RefundDialog order={o} payment={refunding} onClose={() => setRefunding(null)} onDone={refresh} />}
       {cancelling && <CancelDialog order={o} onClose={() => setCancelling(false)} onDone={refresh} />}
     </div>
   );
@@ -158,6 +162,42 @@ function CancelDialog({ order, onClose, onDone }: { order: any; onClose: () => v
         {order.paidMinor > 0 && <p className="rounded-md bg-amber-50 p-3 text-sm text-warning">This order has payments. Refund them first — refunds arrive with the finance module.</p>}
         <Field label="Reason (required)">{(id) => <Input id={id} value={reason} onChange={(e) => setReason(e.target.value)} />}</Field>
         <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Keep order</Button><Button type="submit" variant="danger" loading={m.isPending} disabled={reason.trim().length < 3}>Cancel order</Button></div>
+      </form>
+    </Dialog>
+  );
+}
+
+/** Request a refund of one payment. If the requester may approve it, it is approved and paid out in one step. */
+function RefundDialog({ order, payment, onClose, onDone }: { order: any; payment: any; onClose: () => void; onDone: () => unknown }) {
+  const [amount, setAmount] = useState((payment.refundableMinor / 100).toFixed(2)); const [reason, setReason] = useState('');
+  const [outcome, setOutcome] = useState<{ status: string; paid: boolean; blocked?: string } | null>(null);
+  const m = useMutation({
+    mutationFn: async () => {
+      const rq = await post(`/orders/${order.id}/refund-requests`, { paymentId: payment.id, amountMinor: toMinor(amount), reason });
+      if (rq.status !== 'approved') return { status: rq.status as string, paid: false };
+      try { await post(`/refund-requests/${rq.id}/complete`, {}); return { status: 'completed', paid: true }; }
+      catch (e) { return { status: 'approved', paid: false, blocked: (e as ApiError).code === 'SHIFT_REQUIRED' ? 'Open your till, then pay it out from the Refunds page.' : (e as ApiError).message }; }
+    },
+    onSuccess: async (r) => { setOutcome(r); await onDone(); },
+  });
+  const am = toMinor(amount || '0');
+  if (outcome) return (
+    <Dialog title={outcome.paid ? 'Refund paid' : 'Refund requested'} onClose={onClose}>
+      <p role="status" className={`rounded-md p-3 ${outcome.paid ? 'bg-green-50 text-success' : 'bg-amber-50 text-warning'}`}>
+        {outcome.paid ? `${fmt(am)} refunded${payment.method === 'cash' ? ' — hand the cash to the customer.' : ' — return it on the card terminal / e-transfer.'}`
+          : outcome.status === 'pending' ? 'Sent for approval. A manager will review it on the Refunds page.' : outcome.blocked}</p>
+      <div className="mt-4 flex justify-end"><Button onClick={onClose}>Done</Button></div>
+    </Dialog>
+  );
+  return (
+    <Dialog title={`Refund ${METHODS[payment.method]} payment`} onClose={onClose}>
+      <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
+        <ErrorBanner error={m.error} />
+        <p className="text-sm text-muted">Up to {fmt(payment.refundableMinor)} can be refunded. It is returned by the same method as the original payment.</p>
+        <Field label="Amount ($)">{(id) => <Input id={id} inputMode="decimal" required value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} />}</Field>
+        <Field label="Reason (required)">{(id) => <Input id={id} required autoFocus value={reason} onChange={(e) => setReason(e.target.value)} />}</Field>
+        <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" loading={m.isPending} disabled={am <= 0 || am > payment.refundableMinor || reason.trim().length < 3}>Refund {am > 0 ? fmt(am) : ''}</Button></div>
       </form>
     </Dialog>
   );

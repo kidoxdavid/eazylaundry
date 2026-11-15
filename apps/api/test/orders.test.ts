@@ -9,6 +9,8 @@ const key = () => `k-${randomUUID()}`;
 
 async function setup(app: any) {
   const t: T = await registerTenant(app);
+  // These suites test order/payment mechanics; till (shift) enforcement has its own suite (cash.test.ts).
+  await t.client.put('/config/cash.require_shift', { scope: 'tenant', value: false });
   const wf = (await t.client.post('/services', { code: 'WF', name: 'Wash & Fold', pricingModel: 'per_kg', expressCapable: true, turnaroundHours: 48,
     price: { unitPriceMinor: 250, minChargeMinor: 1000, express: { type: 'percent', percent: 50 } } })).body.id;
   const shirt = (await t.client.post('/services', { code: 'SH', name: 'Shirt', pricingModel: 'per_item', turnaroundHours: 24, price: { unitPriceMinor: 399 } })).body.id;

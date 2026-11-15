@@ -16,6 +16,7 @@ async function payFull(c: Client, orderId: string, amountMinor: number) {
 
 async function shop(app: any) {
   const t = await registerTenant(app);
+  await t.client.put('/config/cash.require_shift', { scope: 'tenant', value: false }); // till enforcement is tested in cash.test.ts
   const shirt = (await t.client.post('/services', { code: 'SH', name: 'Shirt', pricingModel: 'per_item', turnaroundHours: 24, price: { unitPriceMinor: 1000 } })).body.id;
   const customer = (await t.client.post('/customers', { fullName: 'Ada Lovelace', phone: '7805550101' })).body.id;
   const newOrder = async (over: any = {}) => (await createOrder(t.client, { branchId: t.branchId, customerId: customer, lines: [{ serviceId: shirt, quantity: 1 }], ...over })).body;
